@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "./reference.css";
+
+@theme {
+  --color-primary: #f20a87;
+  --color-primary-dark: #c90970;
+  --color-blush: #fff0f7;
+  --color-canvas: #fff9fc;
+  --color-ink: #242124;
+  --color-muted: #637168;
+  --color-line: #f0e2e8;
+  --color-gold: #c38b4c;
+  --color-success: #4fad0a;
+  --color-leaf: #4fad0a;
+  --color-deep: #17672e;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-sans: Arial, "Segoe UI", sans-serif;
+  --radius-card: 10px;
+  --radius-button: 7px;
+  --shadow-card: 0 10px 30px rgba(73, 38, 55, 0.065);
+}

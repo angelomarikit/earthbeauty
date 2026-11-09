@@ -1,0 +1,18 @@
+/* Earth Beauty & Wellness — suggested tokens sampled/approximated from client branding.
+   Fine-tune against the actual images after browser rendering. */
+:root {
+  --brand-pink: #F20A87;
+  --brand-pink-dark: #C90970;
+  --brand-pink-soft: #FFF0F7;
+  --brand-green: #4FAD0A;
+  --brand-green-dark: #17672E;
+  --brand-green-soft: #EFF8EA;
+  --brand-white: #FFFFFF;
+  --brand-background: #FFF9FC;
+  --brand-surface: #FFFFFF;
+  --brand-text: #283329;
+  --brand-text-muted: #637168;
+  --brand-border: #F0E2E8;
+  --brand-radius-card: 12px;
+  --brand-radius-button: 10px;
+}
