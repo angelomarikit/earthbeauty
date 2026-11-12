@@ -419,6 +419,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               const preview = await productionFetchOrderById(orderId)
               const startCheckout = xenditPaymentProvider.createCheckoutSession
               if (preview && startCheckout) {
+                const origin = typeof window !== 'undefined' ? window.location.origin : ''
                 const gateway = await startCheckout({
                   orderId,
                   orderNumber: preview.orderNumber,
@@ -427,6 +428,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   customerEmail: input.email,
                   customerName: input.customerName,
                   description: `Order ${preview.orderNumber}`,
+                  successRedirectUrl: origin ? `${origin}/order-confirmation/${preview.orderNumber}` : undefined,
+                  failureRedirectUrl: origin ? `${origin}/checkout` : undefined,
                 })
                 if (gateway.ok && gateway.checkoutUrl) {
                   window.location.assign(gateway.checkoutUrl)

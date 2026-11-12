@@ -107,7 +107,7 @@ export function PaymentSettingsCards({ form, set }: PaymentSettingsCardsProps) {
           logoAlt="Xendit"
         >
           <p className="muted tiny" style={{ margin: '0 0 10px', lineHeight: 1.55 }}>
-            Set <b>XENDIT_SECRET_KEY</b> on the <code>xendit-create-invoice</code> Edge Function. Keep <b>GCash or QR Ph</b> on so orders are created before redirect.
+            Deploy <code>supabase/functions/xendit-create-invoice</code> to this project, then set Edge Function secret <b>XENDIT_SECRET_KEY</b> (full key from Xendit → Developers → API keys, starts with <code>xnd_</code>). A missing secret returns HTTP 503. Keep <b>GCash or QR Ph</b> enabled so the order is created before redirect.
           </p>
           <p className="muted tiny" style={{ margin: 0 }}>
             Run <code>0004_xendit_gateway_flags.sql</code> if saving fails.

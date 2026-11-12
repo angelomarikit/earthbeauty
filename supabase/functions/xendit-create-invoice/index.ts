@@ -11,16 +11,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function loadXenditSecret(): { secret: string } | { error: string; code: string; secretPresent: boolean } {
+  const raw =
+    Deno.env.get('XENDIT_SECRET_KEY') ??
+    Deno.env.get('XENDIT_SECRET') ??
+    Deno.env.get('XENDIT_API_KEY') ??
+    ''
+  const secret = raw.trim()
+  if (!secret) {
+    return {
+      error:
+        'XENDIT_SECRET_KEY is not set for Edge Functions. Supabase Dashboard → Edge Functions → Secrets (project secrets, not Database). Name must be exactly XENDIT_SECRET_KEY.',
+      code: 'missing_secret',
+      secretPresent: false,
+    }
+  }
+  if (!secret.startsWith('xnd_')) {
+    return {
+      error:
+        'XENDIT_SECRET_KEY is set but is not a Xendit secret API key (must start with xnd_development_ or xnd_production_). Use Developers → API keys in the Xendit dashboard, not a merchant or public key.',
+      code: 'invalid_secret_format',
+      secretPresent: true,
+    }
+  }
+  return { secret }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const secret = Deno.env.get('XENDIT_SECRET_KEY')
-  if (!secret?.startsWith('xnd_')) {
-    return new Response(JSON.stringify({ error: 'Xendit is not configured on the server.' }), {
-      status: 503,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+  const loaded = loadXenditSecret()
+  if ('error' in loaded) {
+    return new Response(
+      JSON.stringify({
+        error: loaded.error,
+        code: loaded.code,
+        secretPresent: loaded.secretPresent,
+      }),
+      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
   }
+  const secret = loaded.secret
 
   try {
     const body = await req.json()

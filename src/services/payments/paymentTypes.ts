@@ -25,6 +25,8 @@ export type CreateGatewayPaymentInput = {
   customerEmail: string
   customerName: string
   description: string
+  successRedirectUrl?: string
+  failureRedirectUrl?: string
 }
 
 export type CreateGatewayPaymentResult =

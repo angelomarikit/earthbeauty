@@ -26,16 +26,47 @@ export const xenditPaymentProvider: PaymentProvider = {
         customerEmail: input.customerEmail,
         customerName: input.customerName,
         description: input.description,
+        successRedirectUrl: input.successRedirectUrl,
+        failureRedirectUrl: input.failureRedirectUrl,
       },
     })
 
-    if (error) {
-      return { ok: false, message: error.message || 'Xendit checkout could not be started.' }
+    const payload = data as {
+      checkoutUrl?: string
+      externalId?: string
+      error?: string
+      code?: string
+      secretPresent?: boolean
+    } | null
+
+    if (error || payload?.error) {
+      const detail = payload?.error
+      if (payload?.code === 'missing_secret') {
+        return {
+          ok: false,
+          message:
+            detail ??
+            'XENDIT_SECRET_KEY is missing. Supabase Dashboard → Edge Functions → Secrets → add XENDIT_SECRET_KEY, then redeploy is not required.',
+        }
+      }
+      if (payload?.code === 'invalid_secret_format') {
+        return {
+          ok: false,
+          message:
+            detail ??
+            'The stored Xendit key is not a secret API key. Replace it with the full key from Xendit → Developers → API keys (starts with xnd_development_ or xnd_production_).',
+        }
+      }
+      return { ok: false, message: detail || error?.message || 'Xendit checkout could not be started.' }
     }
 
-    const payload = data as { checkoutUrl?: string; externalId?: string; error?: string } | null
     if (!payload?.checkoutUrl || !payload.externalId) {
-      return { ok: false, message: payload?.error || 'Xendit did not return a checkout URL.' }
+      return {
+        ok: false,
+        message:
+          payload?.error ||
+          'Xendit did not return a checkout URL. Check that the Edge Function is deployed and the secret key is valid.',
+      }
     }
 
     return {
