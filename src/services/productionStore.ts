@@ -1,3 +1,4 @@
+import { defaultShippingMethods } from '@/data/shipping/defaultMethods'
 import { getSupabase } from '@/lib/supabase'
 import { toDbPaymentMethod } from '@/lib/paymentMethods'
 import type {
@@ -9,6 +10,7 @@ import type {
   PackStyle,
   PaymentProof,
   Product,
+  ShippingMethod,
   StoreSettings,
 } from '@/types'
 
@@ -20,6 +22,19 @@ function asText(value: unknown, fallback = '') {
 
 function asNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' ? value : fallback
+}
+
+function mapShippingRows(rows: Row[]): ShippingMethod[] {
+  const mapped = rows.map((row) => ({
+    id: asText(row.id),
+    name: asText(row.name),
+    feeCentavos: asNumber(row.fee_centavos),
+    detail: asText(row.detail, ''),
+    active: Boolean(row.active),
+    carrier: (asText(row.carrier) || undefined) as ShippingMethod['carrier'],
+    jntZone: row.jnt_zone == null || row.jnt_zone === '' ? null : (asText(row.jnt_zone) as NonNullable<ShippingMethod['jntZone']>),
+  }))
+  return mapped.length ? mapped : defaultShippingMethods()
 }
 
 function mapPaymentMethod(value: string): Order['paymentMethod'] {
@@ -278,13 +293,7 @@ export async function loadProductionState(settingsBase?: StoreSettings): Promise
     products: (products.data ?? []).map((row) => mapProduct(row as Row)),
     orders: (orders.data ?? []).map((row) => mapOrder(row as Row)),
     settings: settings.data ? mapSettingsRow(settings.data as Row, settingsFallback) : settingsFallback,
-    shippingMethods: (shipping.data ?? []).map((row) => ({
-      id: asText(row.id),
-      name: asText(row.name),
-      feeCentavos: asNumber(row.fee_centavos),
-      detail: asText(row.detail, ''),
-      active: Boolean(row.active),
-    })),
+    shippingMethods: mapShippingRows(shipping.data ?? []),
     coupons: (coupons.data ?? []).map((row) => ({
       id: asText(row.id),
       code: asText(row.code),
@@ -411,6 +420,21 @@ export async function productionSave(kind: string, payload: unknown) {
     const { id } = payload as { id: string }
     await supabase.from('product_variants').delete().eq('product_id', id)
     const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    return
+  }
+
+  if (kind === 'shipping') {
+    const method = payload as ShippingMethod
+    const { error } = await supabase.from('shipping_methods').upsert({
+      id: method.id,
+      name: method.name,
+      fee_centavos: method.feeCentavos,
+      detail: method.detail,
+      active: method.active,
+      carrier: method.carrier ?? '',
+      jnt_zone: method.jntZone ?? null,
+    })
     if (error) throw new Error(error.message)
     return
   }

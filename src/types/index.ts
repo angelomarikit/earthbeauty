@@ -196,6 +196,8 @@ export type ShippingMethod = {
   feeCentavos: number
   detail: string
   active: boolean
+  carrier?: 'jnt' | 'pickup' | ''
+  jntZone?: 'luzon' | 'manila' | 'visayas' | 'mindanao' | 'island' | null
 }
 
 export type StoreSettings = {

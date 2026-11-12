@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@jobuntux/psgc": "^0.2.1",
     "@supabase/supabase-js": "^2.81.1",
     "@tanstack/react-query": "^5.90.6",
     "lucide-react": "^0.553.0",
@@ -23,8 +24,8 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
     "@tailwindcss/vite": "^4.1.16",
+    "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",

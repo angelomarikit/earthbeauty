@@ -497,12 +497,38 @@ export function SettingsAdminPage() {
         onClose={() => setSaveError(null)}
       />
       <div className="whitepanel" style={{ marginTop: 16 }}>
-        <h3>Shipping methods</h3>
+        <div className="between" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Shipping methods</h3>
+            <div className="eyebrow" style={{ marginTop: 6 }}>J&amp;T · SANTA ROSA, LAGUNA</div>
+          </div>
+          <img src="/assets/shipping/jnt.svg" alt="J&amp;T Express" width={112} height={38} />
+        </div>
+        <p className="muted small" style={{ marginTop: 10, maxWidth: 640, lineHeight: 1.55 }}>
+          Zone fees follow J&amp;T list rates from Luzon (≈1–3&nbsp;kg bracket). Checkout picks the rate for the customer’s region automatically.
+        </p>
         {state.shippingMethods.map((method) => (
-          <div key={method.id} className="grid3" style={{ marginTop: 10 }}>
-            <input className="field-input" value={method.name} onChange={(event) => saveShipping({ ...method, name: event.target.value })} />
-            <input className="field-input" type="number" value={method.feeCentavos / 100} onChange={(event) => saveShipping({ ...method, feeCentavos: Math.round(Number(event.target.value) * 100) })} />
-            <label className="checkline"><input type="checkbox" checked={method.active} onChange={(event) => saveShipping({ ...method, active: event.target.checked })} /> Active</label>
+          <div key={method.id} className="payment-setting-card" style={{ marginTop: 12 }}>
+            <div className="between" style={{ gap: 12, flexWrap: 'wrap' }}>
+              <b className="small">{method.name}</b>
+              <label className="checkline">
+                <input type="checkbox" checked={method.active} onChange={(event) => saveShipping({ ...method, active: event.target.checked })} /> Active
+              </label>
+            </div>
+            <div className="grid2" style={{ marginTop: 10 }}>
+              <Field label="Fee (₱)">
+                <input
+                  className="field-input"
+                  type="number"
+                  step="0.01"
+                  value={method.feeCentavos / 100}
+                  onChange={(event) => saveShipping({ ...method, feeCentavos: Math.round(Number(event.target.value) * 100) })}
+                />
+              </Field>
+              <Field label="Notes">
+                <input className="field-input" value={method.detail} onChange={(event) => saveShipping({ ...method, detail: event.target.value })} />
+              </Field>
+            </div>
           </div>
         ))}
       </div>

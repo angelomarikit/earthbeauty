@@ -47,9 +47,6 @@ export function PolicySettingsEditor({ policies, onChange }: PolicySettingsEdito
   return (
     <div className="policy-settings">
       <div className="between" style={{ alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
-        <p className="muted small" style={{ margin: 0, maxWidth: 520 }}>
-          Linked from checkout and Help. Use clear, customer-friendly language.
-        </p>
         <span className={`policy-settings__status${drafted === POLICY_KEYS.length ? ' complete' : ''}`}>
           {drafted} of {POLICY_KEYS.length} published
         </span>

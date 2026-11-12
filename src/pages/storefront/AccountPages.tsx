@@ -7,6 +7,7 @@ import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { formatDate, formatPeso, fulfillmentClass, fulfillmentLabel } from '@/lib/format'
 import { usePageMeta } from '@/lib/seo'
+import { PhilippinesAddressFields } from '@/components/forms/PhilippinesAddressFields'
 import type { Address } from '@/types'
 
 export function AccountPage() {
@@ -145,18 +146,25 @@ function AddressBook({ addresses, onChange }: { userId: string; addresses: Addre
         </div>
       ))}
       <div className="grid2" style={{ marginTop: 18 }}>
-        {(['label', 'fullName', 'phone', 'street', 'city', 'barangay', 'postalCode'] as const).map((key) => (
+        {(['label', 'fullName', 'phone', 'street', 'postalCode'] as const).map((key) => (
           <div className="form-group" key={key}>
             <label className="fieldlabel">{key}</label>
             <input className="field-input" value={draft[key] as string} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
           </div>
         ))}
       </div>
+      <PhilippinesAddressFields
+        region={draft.region}
+        province={draft.province}
+        city={draft.city}
+        barangay={draft.barangay}
+        setValue={(field, value) => setDraft((current) => ({ ...current, [field]: value }))}
+      />
       <button
         className="btn"
         type="button"
         onClick={() => {
-          if (!draft.fullName || !draft.street) return
+          if (!draft.fullName || !draft.street || !draft.region || !draft.province || !draft.city || !draft.barangay) return
           onChange([...addresses, { ...draft, id: `addr-${Date.now()}` }])
           setDraft({ ...draft, fullName: '', street: '' })
         }}

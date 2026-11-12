@@ -3,6 +3,7 @@ import { buildSeed, SEED_KEY, SEED_VERSION } from '@/data/demo/seed'
 import { DATA_MODE } from '@/lib/mode'
 import { uid } from '@/lib/format'
 import { couponDiscount, findVariant, unitPrice } from '@/features/catalog/pricing'
+import { defaultShippingMethods } from '@/data/shipping/defaultMethods'
 import type { Address, Banner, Brand, Category, Coupon, DemoState, DemoUser, Order, PaymentMethod, Product, ShippingMethod, StoreSettings } from '@/types'
 
 export type PlaceOrderInput = {
@@ -99,7 +100,7 @@ function emptyProduction(): DemoState {
     products: [],
     orders: [],
     settings: { ...seed.settings, showPreviewCatalogueNotice: false },
-    shippingMethods: [],
+    shippingMethods: defaultShippingMethods(),
     coupons: [],
     banners: [],
     users: [],
@@ -530,6 +531,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ? current.shippingMethods.map((entry) => (entry.id === method.id ? method : entry))
             : [...current.shippingMethods, method],
         }))
+        if (mode === 'production') void productionSave('shipping', method)
       },
       addNewsletter: (email) => {
         setState((current) => ({ ...current, newsletter: current.newsletter.includes(email) ? current.newsletter : [...current.newsletter, email] }))

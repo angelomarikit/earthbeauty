@@ -11,7 +11,14 @@ import { cartDetailed, couponDiscount } from '@/features/catalog/pricing'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
-import { regions } from '@/data/demo/locations'
+import { PhilippinesAddressFields } from '@/components/forms/PhilippinesAddressFields'
+import {
+  estimateParcelWeightGrams,
+  jntFeeCentavos,
+  JNT_SHIP_FROM,
+  jntRateSummary,
+  regionToJntZone,
+} from '@/features/shipping/jntRates'
 import { formatPeso } from '@/lib/format'
 import { manualMethodsRequireProof } from '@/lib/paymentMethods'
 import type { PaymentMethod } from '@/types'
@@ -88,22 +95,30 @@ export function CheckoutPage() {
   const shippingMethodId = form.watch('shippingMethodId')
   const voucher = form.watch('voucher')
   const payment = form.watch('payment') as PaymentMethod
-  const region = regions.find((entry) => entry.name === regionName)
-  const province = region?.provinces.find((entry) => entry.name === provinceName)
-  const city = province?.cities.find((entry) => entry.name === cityName)
+  const barangayName = form.watch('barangay')
   const method = state.shippingMethods.find((entry) => entry.id === shippingMethodId)
   const coupon = state.coupons.find((entry) => entry.active && entry.code.toLowerCase() === (voucher ?? '').trim().toLowerCase())
   const discount = couponDiscount(coupon, subtotal)
+  const itemQty = detailed.reduce((sum, line) => sum + line.quantity, 0)
+  const parcelGrams = estimateParcelWeightGrams(itemQty)
   const shipping = method?.feeCentavos ?? 0
   const total = Math.max(0, subtotal - discount + shipping)
-  const methods = useMemo(() => state.shippingMethods.filter((entry) => entry.active), [state.shippingMethods])
+  const activeMethods = useMemo(() => state.shippingMethods.filter((entry) => entry.active), [state.shippingMethods])
+  const deliveryZone = regionName ? regionToJntZone(regionName) : null
+  const deliveryOptions = useMemo(() => {
+    const pickup = activeMethods.filter((entry) => entry.carrier === 'pickup')
+    if (!deliveryZone) return pickup
+    const jnt = activeMethods.find((entry) => entry.carrier === 'jnt' && entry.jntZone === deliveryZone)
+    return jnt ? [jnt, ...pickup] : pickup
+  }, [activeMethods, deliveryZone])
   const needsProof = manualMethodsRequireProof(payment)
+  const jntLightRate =
+    deliveryZone != null ? formatPeso(jntFeeCentavos(deliveryZone, Math.min(parcelGrams, 500))) : null
 
   useEffect(() => {
-    const activeMethods = state.shippingMethods.filter((entry) => entry.active)
     const currentShipping = form.getValues('shippingMethodId')
-    if (!activeMethods.some((entry) => entry.id === currentShipping) && activeMethods[0]) {
-      form.setValue('shippingMethodId', activeMethods[0].id, { shouldValidate: true })
+    if (!deliveryOptions.some((entry) => entry.id === currentShipping) && deliveryOptions[0]) {
+      form.setValue('shippingMethodId', deliveryOptions[0].id, { shouldValidate: true })
     }
     const currentPayment = form.getValues('payment') as PaymentMethod
     const paymentOk =
@@ -115,7 +130,17 @@ export function CheckoutPage() {
     if (!paymentOk) {
       form.setValue('payment', defaultPayment, { shouldValidate: true })
     }
-  }, [state.shippingMethods, state.settings, defaultPayment, form])
+  }, [deliveryOptions, state.shippingMethods, state.settings, defaultPayment, form])
+
+  useEffect(() => {
+    if (!deliveryZone) return
+    const jnt = activeMethods.find((entry) => entry.carrier === 'jnt' && entry.jntZone === deliveryZone)
+    if (!jnt) return
+    const current = state.shippingMethods.find((entry) => entry.id === form.getValues('shippingMethodId'))
+    if (!current || current.carrier === 'jnt') {
+      form.setValue('shippingMethodId', jnt.id, { shouldValidate: true })
+    }
+  }, [deliveryZone, activeMethods, state.shippingMethods, form])
 
   const onInvalid = (errors: FieldErrors<FormValues>) => {
     const first =
@@ -159,8 +184,8 @@ export function CheckoutPage() {
       setFormError('Sign in to place an order.')
       return
     }
-    if (!methods.length) {
-      setFormError('No delivery methods are configured. Contact the store.')
+    if (!deliveryOptions.length) {
+      setFormError('Select your region to see J&T Express rates, or choose store pickup.')
       return
     }
     if (needsProof && !proofFile) {
@@ -269,34 +294,20 @@ export function CheckoutPage() {
                 <Field label="Complete Street Address *" error={form.formState.errors.street?.message}>
                   <input className="field-input" {...form.register('street')} placeholder="House no., street, subdivision / building" />
                 </Field>
-                <div className="grid2">
-                  <Field label="Region *" error={form.formState.errors.region?.message}>
-                    <select className="field-input" {...form.register('region')} onChange={(event) => { form.setValue('region', event.target.value); form.setValue('province', ''); form.setValue('city', ''); form.setValue('barangay', '') }}>
-                      <option value="">Select region</option>
-                      {regions.map((entry) => <option key={entry.name}>{entry.name}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Province *" error={form.formState.errors.province?.message}>
-                    <select className="field-input" {...form.register('province')} onChange={(event) => { form.setValue('province', event.target.value); form.setValue('city', ''); form.setValue('barangay', '') }}>
-                      <option value="">Select province</option>
-                      {region?.provinces.map((entry) => <option key={entry.name}>{entry.name}</option>)}
-                    </select>
-                  </Field>
-                </div>
-                <div className="grid2">
-                  <Field label="City / Municipality *" error={form.formState.errors.city?.message}>
-                    <select className="field-input" {...form.register('city')} onChange={(event) => { form.setValue('city', event.target.value); form.setValue('barangay', '') }}>
-                      <option value="">Select city</option>
-                      {province?.cities.map((entry) => <option key={entry.name}>{entry.name}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Barangay *" error={form.formState.errors.barangay?.message}>
-                    <select className="field-input" {...form.register('barangay')}>
-                      <option value="">Select barangay</option>
-                      {city?.barangays.map((entry) => <option key={entry}>{entry}</option>)}
-                    </select>
-                  </Field>
-                </div>
+                <PhilippinesAddressFields
+                  region={regionName}
+                  province={provinceName}
+                  city={cityName}
+                  barangay={barangayName}
+                  setValue={(field, value) => form.setValue(field, value, { shouldValidate: true })}
+                  fieldRef={(name) => form.register(name)}
+                  errors={{
+                    region: form.formState.errors.region?.message,
+                    province: form.formState.errors.province?.message,
+                    city: form.formState.errors.city?.message,
+                    barangay: form.formState.errors.barangay?.message,
+                  }}
+                />
                 <Field label="Postal Code *" error={form.formState.errors.postalCode?.message}>
                   <input className="field-input" style={{ width: '50%' }} {...form.register('postalCode')} />
                 </Field>
@@ -305,19 +316,33 @@ export function CheckoutPage() {
                 </Field>
                 <div className="form-group">
                   <div className="fieldlabel">Delivery method</div>
-                  {!methods.length ? (
-                    <p className="form-error" style={{ marginTop: 8 }}>
-                      No delivery methods are available. Add one in Admin → Store Settings → Shipping methods.
+                  <p className="muted tiny" style={{ margin: '0 0 12px', lineHeight: 1.55 }}>
+                    Courier rates from <b>{JNT_SHIP_FROM}</b> via J&amp;T Express (Philippines list rates).
+                  </p>
+                  {!regionName ? (
+                    <p className="muted small" style={{ marginBottom: 12 }}>
+                      Select your <b>region</b> above to load your J&amp;T zone rate, or choose store pickup below.
                     </p>
                   ) : null}
-                  {methods.map((entry) => (
+                  {deliveryOptions.map((entry) => (
                     <label key={entry.id} className={`pay-option ${shippingMethodId === entry.id ? 'on' : ''}`}>
                       <div className="pay-option__row">
                         <input type="radio" value={entry.id} {...form.register('shippingMethodId')} />
-                        <b>{entry.name}</b>
-                        <span className="muted small"> · {entry.feeCentavos === 0 ? 'No fee' : formatPeso(entry.feeCentavos)}</span>
+                        {entry.carrier === 'jnt' ? (
+                          <img className="pay-method-logo" src="/assets/shipping/jnt.svg" alt="J&amp;T Express" width={112} height={38} />
+                        ) : (
+                          <b>{entry.name}</b>
+                        )}
+                        <span className="muted small"> · {entry.feeCentavos === 0 ? 'Free' : formatPeso(entry.feeCentavos)}</span>
                       </div>
-                      {entry.detail ? <p className="muted small">{entry.detail}</p> : null}
+                      {entry.carrier === 'jnt' && deliveryZone ? (
+                        <p className="muted small" style={{ lineHeight: 1.55 }}>
+                          {jntRateSummary(deliveryZone, parcelGrams)}
+                          {jntLightRate && parcelGrams <= 500 ? <> · Light orders from {jntLightRate}.</> : null}
+                        </p>
+                      ) : entry.detail ? (
+                        <p className="muted small">{entry.detail}</p>
+                      ) : null}
                     </label>
                   ))}
                 </div>
@@ -441,7 +466,7 @@ export function CheckoutPage() {
                 className="btn wide"
                 style={{ marginTop: 25 }}
                 type="submit"
-                disabled={submitting || !methods.length || (mode === 'production' && !user)}
+                disabled={submitting || !deliveryOptions.length || (mode === 'production' && !user)}
               >
                 {submitting ? 'PLACING ORDER…' : 'PLACE ORDER →'}
               </button>

@@ -8,10 +8,10 @@ import type {
   Order,
   PackStyle,
   Product,
-  ShippingMethod,
   StoreSettings,
   Variant,
 } from '@/types'
+import { defaultShippingMethods } from '@/data/shipping/defaultMethods'
 import { pesosToCentavos } from '@/lib/format'
 
 const SEED_VERSION = 1
@@ -441,10 +441,7 @@ const coupons: Coupon[] = [
   { id: 'cp-care', code: 'CARE150', type: 'fixed', amount: 15000, active: true, minSubtotalCentavos: 100000, label: 'Demonstration ₱150 voucher' },
 ]
 
-const shippingMethods: ShippingMethod[] = [
-  { id: 'ship-standard', name: 'Standard Delivery', feeCentavos: 9900, detail: 'Demonstration flat rate. Replace with the merchant’s real zones.', active: true },
-  { id: 'ship-pickup', name: 'Store Pickup — Santa Rosa', feeCentavos: 0, detail: 'Pickup at the Gran Esperanza store address during posted hours.', active: true },
-]
+const shippingMethods = defaultShippingMethods()
 
 const settings: StoreSettings = {
   businessName: 'Earth Beauty & Wellness',
