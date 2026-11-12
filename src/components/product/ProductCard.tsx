@@ -1,7 +1,7 @@
 import { Heart, ShoppingBag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { brandName, comparePrice, unitPrice } from '@/features/catalog/pricing'
+import { brandName, cartVariantId, comparePrice, findVariant, unitPrice } from '@/features/catalog/pricing'
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { formatPeso } from '@/lib/format'
@@ -33,7 +33,7 @@ export function ProductCard({ product }: { product: Product }) {
   const { state } = useStore()
   const { add, saved, toggleSaved } = useCart()
   const [message, setMessage] = useState<string | null>(null)
-  const variant = product.variants[0]
+  const variant = findVariant(product, null)
   const wished = saved.includes(product.id)
 
   return (
@@ -53,7 +53,7 @@ export function ProductCard({ product }: { product: Product }) {
         <button
           className="btn light add-hover"
           onClick={() => {
-            const error = add(product.id, variant?.id ?? null, 1)
+            const error = add(product.id, cartVariantId(product, variant), 1)
             setMessage(error ?? 'Added')
             window.setTimeout(() => setMessage(null), 1600)
           }}

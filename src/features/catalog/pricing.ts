@@ -8,12 +8,32 @@ export function findProduct(state: DemoState, idOrSlug: string) {
   return state.products.find((product) => product.id === idOrSlug || product.slug === idOrSlug)
 }
 
+export function defaultVariant(product: Product): Variant {
+  return {
+    id: `${product.id}-standard`,
+    label: 'Standard',
+    sku: product.sku,
+    priceCentavos: product.priceCentavos,
+    compareAtCentavos: product.compareAtCentavos,
+    stock: product.stock,
+    active: true,
+  }
+}
+
+/** Real DB variant id for checkout, or null when the product has no variant rows. */
+export function cartVariantId(product: Product, variant: Variant): string | null {
+  return product.variants.some((entry) => entry.id === variant.id) ? variant.id : null
+}
+
 export function findVariant(product: Product, variantId: string | null) {
   if (variantId) {
     const match = product.variants.find((variant) => variant.id === variantId && variant.active)
     if (match) return match
+    const any = product.variants.find((variant) => variant.id === variantId)
+    if (any) return any
   }
-  return product.variants.find((variant) => variant.active) ?? product.variants[0]
+  const fromList = product.variants.find((variant) => variant.active) ?? product.variants[0]
+  return fromList ?? defaultVariant(product)
 }
 
 export function unitPrice(product: Product, variant?: Variant | null) {

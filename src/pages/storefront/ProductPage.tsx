@@ -2,7 +2,7 @@ import { Heart, ShoppingBag, Truck } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PackArt, PriceDisplay, ProductGrid } from '@/components/product/ProductCard'
-import { availableStock, brandName, comparePrice, unitPrice } from '@/features/catalog/pricing'
+import { availableStock, brandName, cartVariantId, comparePrice, findProduct, findVariant, unitPrice } from '@/features/catalog/pricing'
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { usePageMeta } from '@/lib/seo'
@@ -10,10 +10,11 @@ import type { PackStyle } from '@/types'
 
 export function ProductPage() {
   const { slug } = useParams()
-  const { state } = useStore()
+  const { state, mode } = useStore()
   const { add, toggleSaved, saved } = useCart()
   const navigate = useNavigate()
-  const product = state.products.find((entry) => entry.slug === slug && entry.active)
+  const product = slug ? findProduct(state, slug) : undefined
+  const sellable = product?.active ?? false
   const [pack, setPack] = useState<PackStyle | null>(null)
   const [variantId, setVariantId] = useState<string | null>(null)
   const [qty, setQty] = useState(1)
@@ -21,7 +22,7 @@ export function ProductPage() {
   const [message, setMessage] = useState<string | null>(null)
   const category = state.categories.find((entry) => entry.id === product?.categoryId)
   const supplierBrand = product ? brandName(state, product.brandId, state.settings.legalName) : state.settings.legalName
-  const variant = product?.variants.find((entry) => entry.id === (variantId ?? product.variants[0]?.id)) ?? product?.variants[0]
+  const variant = product ? findVariant(product, variantId) : null
   const stock = product && variant ? availableStock(product, variant) : 0
   const wished = product ? saved.includes(product.id) : false
 
@@ -32,12 +33,16 @@ export function ProductPage() {
     return state.products.filter((entry) => entry.active && entry.categoryId === product.categoryId && entry.id !== product.id).slice(0, 4)
   }, [product, state.products])
 
-  if (!product || !variant) {
+  if (!product || !sellable || !variant) {
     return (
       <div className="page">
         <div className="wrap empty whitepanel">
           <h1 className="page-title">Product unavailable</h1>
-          <p className="muted">This demonstration item is inactive or missing.</p>
+          <p className="muted">
+            {mode === 'production'
+              ? 'This item is not active, was removed, or the link is outdated.'
+              : 'This demonstration item is inactive or missing.'}
+          </p>
           <Link className="btn" to="/shop" style={{ marginTop: 16 }}>
             Back to shop
           </Link>
@@ -52,7 +57,7 @@ export function ProductPage() {
     : 0
 
   function addLine(buyNow = false) {
-    const error = add(product!.id, variant!.id, qty)
+    const error = add(product!.id, cartVariantId(product!, variant!), qty)
     setMessage(error)
     if (!error && buyNow) navigate('/checkout')
     if (!error && !buyNow) setMessage('Added to cart.')
