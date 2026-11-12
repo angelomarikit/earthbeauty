@@ -1,5 +1,6 @@
 import { AdminConfirmModal } from '@/components/admin/AdminModal'
 import { PaymentSettingsCards } from '@/components/admin/PaymentSettingsCards'
+import { PolicySettingsEditor } from '@/components/admin/PolicySettingsEditor'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, XAxis } from 'recharts'
@@ -455,12 +456,13 @@ export function SettingsAdminPage() {
           <PaymentSettingsCards form={form} set={set} />
         </div>
         <div className="whitepanel" style={{ marginTop: 16 }}>
-          <h3>Draft policies</h3>
-          {(['shipping', 'returns', 'privacy', 'terms'] as const).map((key) => (
-            <Field key={key} label={key}>
-              <textarea className="field-input" value={form.policies[key]} onChange={(event) => set('policies', { ...form.policies, [key]: event.target.value })} />
-            </Field>
-          ))}
+          <div className="between" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Store policies</h3>
+              <div className="eyebrow" style={{ marginTop: 6 }}>LEGAL &amp; HELP</div>
+            </div>
+          </div>
+          <PolicySettingsEditor policies={form.policies} onChange={(policies) => set('policies', policies)} />
         </div>
         <button className="btn" style={{ marginTop: 16 }} type="submit">SAVE SETTINGS</button>
       </form>
