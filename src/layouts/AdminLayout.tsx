@@ -21,8 +21,8 @@ export function AdminLayout() {
   const { user } = useAuth()
   const location = useLocation()
   const [open, setOpen] = useState(false)
-  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
-  if (user.role !== 'admin') return <Navigate to="/account" replace />
+  if (!user) return <Navigate to={`/admin/login?next=${encodeURIComponent(location.pathname)}`} replace />
+  if (user.role !== 'admin') return <Navigate to="/admin/login" replace />
   const title = titles[location.pathname] ?? (location.pathname.includes('/orders/') ? 'Order' : location.pathname.includes('/products/') ? 'Edit Product' : 'Admin')
 
   return (

@@ -9,7 +9,7 @@ import { StorefrontLayout } from '@/layouts/StorefrontLayout'
 import { DashboardPage } from '@/pages/admin/DashboardPage'
 import { BrandsAdminPage, CategoriesAdminPage, InventoryAdminPage, ProductFormPage, ProductsAdminPage } from '@/pages/admin/CatalogPages'
 import { CustomersAdminPage, MarketingAdminPage, OrderAdminDetailPage, OrdersAdminPage, ReportsAdminPage, SettingsAdminPage } from '@/pages/admin/OperationsPages'
-import { ForgotPasswordPage, LoginPage, RegisterPage } from '@/pages/auth/AuthPages'
+import { AdminLoginPage, ForgotPasswordPage, LoginPage, RegisterPage } from '@/pages/auth/AuthPages'
 import { AccountPage, OrderConfirmationPage, OrderTrackingPage, TrackLookupPage, WishlistPage } from '@/pages/storefront/AccountPages'
 import { CartPage } from '@/pages/storefront/CartPage'
 import { CheckoutPage } from '@/pages/storefront/CheckoutPage'
@@ -26,6 +26,7 @@ export function App() {
           <CartProvider>
             <BrowserRouter>
               <Routes>
+                <Route path="admin/login" element={<AdminLoginPage />} />
                 <Route element={<StorefrontLayout />}>
                   <Route index element={<HomePage />} />
                   <Route path="shop" element={<ShopPage />} />

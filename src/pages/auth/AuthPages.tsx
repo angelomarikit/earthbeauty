@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
@@ -34,7 +34,11 @@ export function LoginPage() {
                 setError(result.error ?? 'Sign-in failed.')
                 return
               }
-              const next = params.get('next') || (result.role === 'admin' ? '/admin' : '/account')
+              const next = params.get('next') || '/account'
+              if (next.startsWith('/admin')) {
+                setError('Open the store dashboard at /admin/login for team sign-in.')
+                return
+              }
               navigate(next)
             })}
           >
@@ -47,6 +51,62 @@ export function LoginPage() {
             <Link to="/forgot-password" className="text-link">Forgot password</Link> · <Link to="/register" className="text-link">Create an account</Link>
           </p>
         </div>
+      </div>
+    </div>
+  )
+}
+
+export function AdminLoginPage() {
+  const { login, user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const [error, setError] = useState<string | null>(null)
+  const form = useForm({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } })
+  usePageMeta('Admin sign in · Earth Beauty & Wellness', 'Sign in to the store dashboard.')
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      navigate(params.get('next') || '/admin', { replace: true })
+    }
+  }, [navigate, params, user?.role])
+
+  return (
+    <div className="admin" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
+      <div className="whitepanel" style={{ width: '100%', maxWidth: 440 }}>
+        <div className="auth-logo"><BrandLogo size="lg" variant="light" priority /></div>
+        <div className="eyebrow">STORE DASHBOARD</div>
+        <h1 className="page-title" style={{ fontSize: 28 }}>Admin sign in</h1>
+        <p className="muted small" style={{ marginTop: 8 }}>Team accounts only. Customers use the main store sign-in.</p>
+        <form
+          style={{ marginTop: 20 }}
+          onSubmit={form.handleSubmit(async (values) => {
+            const result = await login(values.email, values.password)
+            if (!result.ok || !result.role) {
+              setError(result.error ?? 'Sign-in failed.')
+              return
+            }
+            if (result.role !== 'admin') {
+              await logout()
+              setError('This account does not have dashboard access. Ask an administrator to grant the admin role.')
+              return
+            }
+            const next = params.get('next') || '/admin'
+            navigate(next.startsWith('/admin') ? next : '/admin')
+          })}
+        >
+          <div className="form-group"><label className="fieldlabel">Work email</label><input className="field-input" autoComplete="username" {...form.register('email')} /></div>
+          <div className="form-group"><label className="fieldlabel">Password</label><input className="field-input" type="password" autoComplete="current-password" {...form.register('password')} /></div>
+          {error ? <p className="form-error">{error}</p> : null}
+          <button className="btn wide" type="submit">SIGN IN TO DASHBOARD</button>
+        </form>
+        <p className="small" style={{ marginTop: 16 }}>
+          <Link to="/forgot-password" className="text-link">Forgot password</Link>
+        </p>
+        <p className="small muted" style={{ marginTop: 12 }}>
+          <Link to="/" className="text-link">← Back to store</Link>
+          {' · '}
+          <Link to="/login" className="text-link">Customer sign in</Link>
+        </p>
       </div>
     </div>
   )
