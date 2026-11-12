@@ -50,7 +50,7 @@ type StoreValue = {
   adjustStock: (productId: string, variantId: string | null, delta: number, reason: string) => string | null
   updateOrder: (orderId: string, patch: Partial<Order> & { historyNote?: string }) => void
   placeOrder: (input: PlaceOrderInput) => Promise<Order | string>
-  saveSettings: (settings: StoreSettings) => void
+  saveSettings: (settings: StoreSettings) => Promise<void>
   saveBanner: (banner: Banner) => void
   deleteBanner: (id: string) => void
   saveCoupon: (coupon: Coupon) => void
@@ -503,9 +503,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })
         return order
       },
-      saveSettings: (settings) => {
+      saveSettings: async (settings) => {
         setState((current) => audit({ ...current, settings }, 'settings', 'Store settings updated'))
-        if (mode === 'production') void productionSave('settings', settings)
+        if (mode === 'production') await productionSave('settings', settings)
       },
       saveBanner: (banner) => {
         setState((current) => {

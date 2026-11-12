@@ -1,4 +1,4 @@
-import { AdminConfirmModal } from '@/components/admin/AdminModal'
+import { AdminAlertModal, AdminConfirmModal } from '@/components/admin/AdminModal'
 import { PaymentSettingsCards } from '@/components/admin/PaymentSettingsCards'
 import { PolicySettingsEditor } from '@/components/admin/PolicySettingsEditor'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -401,6 +401,9 @@ export function SettingsAdminPage() {
   const { state, saveSettings, saveShipping, resetDemo, mode } = useStore()
   const [form, setForm] = useState<StoreSettings>(state.settings)
   const [resetOpen, setResetOpen] = useState(false)
+  const [saveSuccessOpen, setSaveSuccessOpen] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   useEffect(() => {
     setForm(state.settings)
   }, [state.settings])
@@ -414,7 +417,18 @@ export function SettingsAdminPage() {
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          saveSettings(form)
+          void (async () => {
+            setSaving(true)
+            setSaveError(null)
+            try {
+              await saveSettings(form)
+              setSaveSuccessOpen(true)
+            } catch (error) {
+              setSaveError(error instanceof Error ? error.message : 'Could not save settings. Try again.')
+            } finally {
+              setSaving(false)
+            }
+          })()
         }}
       >
         <div className="grid2" style={{ marginTop: 16 }}>
@@ -464,8 +478,24 @@ export function SettingsAdminPage() {
           </div>
           <PolicySettingsEditor policies={form.policies} onChange={(policies) => set('policies', policies)} />
         </div>
-        <button className="btn" style={{ marginTop: 16 }} type="submit">SAVE SETTINGS</button>
+        <button className="btn" style={{ marginTop: 16 }} type="submit" disabled={saving}>
+          {saving ? 'SAVING…' : 'SAVE SETTINGS'}
+        </button>
       </form>
+      <AdminAlertModal
+        open={saveSuccessOpen}
+        title="Settings saved"
+        description="Your store settings were updated successfully. Payment options and store details will reflect on the storefront where applicable."
+        confirmLabel="GOT IT"
+        onClose={() => setSaveSuccessOpen(false)}
+      />
+      <AdminAlertModal
+        open={saveError !== null}
+        title="Could not save"
+        description={saveError ?? ''}
+        confirmLabel="CLOSE"
+        onClose={() => setSaveError(null)}
+      />
       <div className="whitepanel" style={{ marginTop: 16 }}>
         <h3>Shipping methods</h3>
         {state.shippingMethods.map((method) => (

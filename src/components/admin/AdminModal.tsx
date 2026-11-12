@@ -148,3 +148,26 @@ export function AdminConfirmModal({
     </AdminModal>
   )
 }
+
+type AdminAlertModalProps = {
+  open: boolean
+  title: string
+  description: string
+  confirmLabel?: string
+  onClose: () => void
+}
+
+export function AdminAlertModal({ open, title, description, confirmLabel = 'OK', onClose }: AdminAlertModalProps) {
+  return (
+    <AdminModal open={open} onClose={onClose} title={title}>
+      <p className="muted small" style={{ lineHeight: 1.6 }}>
+        {description}
+      </p>
+      <div className="action-row" style={{ marginTop: 18 }}>
+        <button type="button" className="btn" onClick={onClose}>
+          {confirmLabel}
+        </button>
+      </div>
+    </AdminModal>
+  )
+}
