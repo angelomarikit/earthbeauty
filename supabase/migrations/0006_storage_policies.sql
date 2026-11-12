@@ -1,13 +1,16 @@
 -- Supabase Storage policies for Earth Beauty & Wellness.
 -- Create buckets first in Dashboard: product-images (public), payment-proofs (private), payment-qr (private).
 -- Then run this file in the SQL Editor.
+-- PostgreSQL does not support CREATE POLICY IF NOT EXISTS; policies are dropped and recreated.
 
 -- product-images: public read
-create policy if not exists "product_images_public_read"
+drop policy if exists "product_images_public_read" on storage.objects;
+create policy "product_images_public_read"
 on storage.objects for select
 using (bucket_id = 'product-images');
 
-create policy if not exists "product_images_admin_write"
+drop policy if exists "product_images_admin_write" on storage.objects;
+create policy "product_images_admin_write"
 on storage.objects for all
 using (
   bucket_id = 'product-images'
@@ -18,22 +21,25 @@ with check (
   and public.is_admin()
 );
 
--- payment-proofs: customer upload + own order path; admin read
-create policy if not exists "payment_proofs_insert"
+-- payment-proofs: customer upload; admin and authenticated read (signed URLs / own uploads)
+drop policy if exists "payment_proofs_insert" on storage.objects;
+create policy "payment_proofs_insert"
 on storage.objects for insert
 with check (
   bucket_id = 'payment-proofs'
   and auth.role() = 'authenticated'
 );
 
-create policy if not exists "payment_proofs_admin_read"
+drop policy if exists "payment_proofs_admin_read" on storage.objects;
+create policy "payment_proofs_admin_read"
 on storage.objects for select
 using (
   bucket_id = 'payment-proofs'
   and public.is_admin()
 );
 
-create policy if not exists "payment_proofs_owner_read"
+drop policy if exists "payment_proofs_owner_read" on storage.objects;
+create policy "payment_proofs_owner_read"
 on storage.objects for select
 using (
   bucket_id = 'payment-proofs'
@@ -41,7 +47,8 @@ using (
 );
 
 -- payment-qr: admin only
-create policy if not exists "payment_qr_admin"
+drop policy if exists "payment_qr_admin" on storage.objects;
+create policy "payment_qr_admin"
 on storage.objects for all
 using (bucket_id = 'payment-qr' and public.is_admin())
 with check (bucket_id = 'payment-qr' and public.is_admin());
