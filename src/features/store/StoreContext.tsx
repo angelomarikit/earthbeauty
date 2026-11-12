@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { buildSeed, SEED_KEY, SEED_VERSION } from '@/data/demo/seed'
 import { DATA_MODE } from '@/lib/mode'
 import { uid } from '@/lib/format'
-import { couponDiscount, findVariant, unitPrice } from '@/features/catalog/pricing'
+import { couponDiscount, findVariant, orderLineVariantId, unitPrice } from '@/features/catalog/pricing'
 import { defaultShippingMethods } from '@/data/shipping/defaultMethods'
 import type { Address, Banner, Brand, Category, Coupon, DemoState, DemoUser, Order, PaymentMethod, Product, ShippingMethod, StoreSettings } from '@/types'
 
@@ -100,7 +100,7 @@ function emptyProduction(): DemoState {
     products: [],
     orders: [],
     settings: { ...seed.settings, showPreviewCatalogueNotice: false },
-    shippingMethods: defaultShippingMethods(),
+    shippingMethods: defaultShippingMethods('production'),
     coupons: [],
     banners: [],
     users: [],
@@ -339,11 +339,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const product = state.products.find((entry) => entry.id === line.productId && entry.active)
           if (!product) return 'A product in the cart is no longer available.'
           const variant = findVariant(product, line.variantId)
+          if (!variant) {
+            return `${product.name} has no valid variant. Add a variant in Admin → Products and save.`
+          }
+          const rpcVariantId = orderLineVariantId(product, line.variantId)
+          if (mode === 'production' && !rpcVariantId) {
+            return `${product.name} must use a saved variant UUID before checkout. Re-save the product in admin.`
+          }
           const stock = variant?.stock ?? product.stock
           if (line.quantity < 1 || line.quantity > stock) return `${product.name} does not have enough stock.`
           built.push({
             productId: product.id,
-            variantId: variant?.id ?? null,
+            variantId: rpcVariantId,
             name: product.name,
             variantLabel: variant?.label ?? 'Standard',
             sku: variant?.sku ?? product.sku,

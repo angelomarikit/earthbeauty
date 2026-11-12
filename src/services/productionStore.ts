@@ -1,5 +1,7 @@
 import { defaultShippingMethods } from '@/data/shipping/defaultMethods'
+import { isUuid } from '@/lib/ids'
 import { getSupabase } from '@/lib/supabase'
+import { entityUuid } from '@/lib/format'
 import { toDbPaymentMethod } from '@/lib/paymentMethods'
 import type {
   Brand,
@@ -34,7 +36,7 @@ function mapShippingRows(rows: Row[]): ShippingMethod[] {
     carrier: (asText(row.carrier) || undefined) as ShippingMethod['carrier'],
     jntZone: row.jnt_zone == null || row.jnt_zone === '' ? null : (asText(row.jnt_zone) as NonNullable<ShippingMethod['jntZone']>),
   }))
-  return mapped.length ? mapped : defaultShippingMethods()
+  return mapped.length ? mapped : defaultShippingMethods('production')
 }
 
 function mapPaymentMethod(value: string): Order['paymentMethod'] {
@@ -83,7 +85,7 @@ function mapProduct(row: Row): Product {
     demoSoldLabel: '',
     demoUnitsSold: 0,
     createdAt: asText(row.created_at, new Date().toISOString()),
-    demo: true,
+    demo: false,
   }
 }
 
@@ -201,7 +203,7 @@ function mapOrder(row: Row): Order {
     proofName: null,
     latestProofId: null,
     history: [],
-    demo: true,
+    demo: false,
   }
 }
 
@@ -401,8 +403,9 @@ export async function productionSave(kind: string, payload: unknown) {
     })
     if (productError) throw new Error(productError.message)
     for (const variant of product.variants) {
+      const variantId = isUuid(variant.id) ? variant.id : entityUuid()
       const { error } = await supabase.from('product_variants').upsert({
-        id: variant.id,
+        id: variantId,
         product_id: product.id,
         label: variant.label,
         sku: variant.sku,
@@ -533,7 +536,7 @@ export async function productionPlaceOrder(input: PlaceOrderPayload): Promise<st
       },
       items: input.lines.map((line) => ({
         product_id: line.productId,
-        variant_id: line.variantId,
+        variant_id: line.variantId && isUuid(line.variantId) ? line.variantId : null,
         quantity: line.quantity,
       })),
       shipping_method_id: input.shippingMethodId,

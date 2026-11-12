@@ -34,6 +34,7 @@ export function ProductCard({ product }: { product: Product }) {
   const { add, saved, toggleSaved } = useCart()
   const [message, setMessage] = useState<string | null>(null)
   const variant = findVariant(product, null)
+  const canAdd = Boolean(variant)
   const wished = saved.includes(product.id)
 
   return (
@@ -52,13 +53,15 @@ export function ProductCard({ product }: { product: Product }) {
         </button>
         <button
           className="btn light add-hover"
+          disabled={!canAdd}
           onClick={() => {
+            if (!variant) return
             const error = add(product.id, cartVariantId(product, variant), 1)
             setMessage(error ?? 'Added')
             window.setTimeout(() => setMessage(null), 1600)
           }}
         >
-          <ShoppingBag size={14} /> {message ?? 'ADD TO CART'}
+          <ShoppingBag size={14} /> {!canAdd ? 'UNAVAILABLE' : message ?? 'ADD TO CART'}
         </button>
       </div>
       <Link to={`/product/${product.slug}`} className="pbody">

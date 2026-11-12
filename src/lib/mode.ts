@@ -5,6 +5,7 @@ export function getDataMode(): DataMode {
   const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim()
   const key = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
   if (requested === 'demo') return 'demo'
+  if (requested === 'production') return 'production'
   if (url && key) return 'production'
   return 'demo'
 }

@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { availableStock, findVariant } from '@/features/catalog/pricing'
+import { availableStock, cartVariantId, findVariant } from '@/features/catalog/pricing'
+import { sanitizeCartLines } from '@/features/cart/sanitizeCart'
+import { DATA_MODE } from '@/lib/mode'
 import { useStore } from '@/features/store/StoreContext'
 import type { CartLine } from '@/types'
 
 const CART_KEY = 'ebw-cart-v1'
 const WISH_KEY = 'ebw-wish-v1'
 
-const starterCart: CartLine[] = [
+const demoStarterCart: CartLine[] = [
   { productId: 'p-serum', variantId: 'p-serum-v1', quantity: 1 },
   { productId: 'p-butter', variantId: 'p-butter-v1', quantity: 2 },
   { productId: 'p-rose', variantId: 'p-rose-std', quantity: 1 },
@@ -36,8 +38,19 @@ const CartContext = createContext<CartValue | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { state } = useStore()
-  const [lines, setLines] = useState<CartLine[]>(() => read(CART_KEY, starterCart))
+  const emptyCart = DATA_MODE === 'production' ? [] : demoStarterCart
+  const [lines, setLines] = useState<CartLine[]>(() => read(CART_KEY, emptyCart))
   const [saved, setSaved] = useState<string[]>(() => read(WISH_KEY, [] as string[]))
+
+  useEffect(() => {
+    if (DATA_MODE !== 'production' || !state.products.length) return
+    setLines((current) => {
+      const clean = sanitizeCartLines(current, state)
+      return clean.length === current.length && clean.every((line, i) => JSON.stringify(line) === JSON.stringify(current[i]))
+        ? current
+        : clean
+    })
+  }, [state.products, state])
 
   useEffect(() => localStorage.setItem(CART_KEY, JSON.stringify(lines)), [lines])
   useEffect(() => localStorage.setItem(WISH_KEY, JSON.stringify(saved)), [saved])
@@ -58,13 +71,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
       count: lines.reduce((sum, line) => sum + line.quantity, 0),
       add: (productId, variantId, quantity) => {
         if (quantity < 1) return 'Choose at least 1.'
-        const stock = stockFor(productId, variantId)
-        const existing = lines.find((line) => same(line, productId, variantId))?.quantity ?? 0
+        const product = state.products.find((entry) => entry.id === productId)
+        if (!product) return 'Product not found.'
+        const variant = findVariant(product, variantId)
+        const persistVariantId = cartVariantId(product, variant)
+        if (DATA_MODE === 'production' && !persistVariantId) {
+          return 'This product is not ready for checkout. Ask the store to save a product variant.'
+        }
+        const cartVariant = DATA_MODE === 'production' ? persistVariantId : variantId ?? variant?.id ?? null
+        const stock = stockFor(productId, cartVariant)
+        const existing = lines.find((line) => same(line, productId, cartVariant))?.quantity ?? 0
         if (existing + quantity > stock) return 'That quantity is more than the available stock.'
         setLines((current) => {
-          const found = current.find((line) => same(line, productId, variantId))
-          if (!found) return [...current, { productId, variantId, quantity }]
-          return current.map((line) => (same(line, productId, variantId) ? { ...line, quantity: line.quantity + quantity } : line))
+          const found = current.find((line) => same(line, productId, cartVariant))
+          if (!found) return [...current, { productId, variantId: cartVariant, quantity }]
+          return current.map((line) => (same(line, productId, cartVariant) ? { ...line, quantity: line.quantity + quantity } : line))
         })
         return null
       },

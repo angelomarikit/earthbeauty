@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { BrandLogo } from '@/components/branding/BrandLogo'
 import { FileUploadField } from '@/components/forms/FileUploadField'
 import { PackArt } from '@/components/product/ProductCard'
-import { cartDetailed, couponDiscount } from '@/features/catalog/pricing'
+import { cartDetailed, couponDiscount, orderLineVariantId } from '@/features/catalog/pricing'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
@@ -218,7 +218,11 @@ export function CheckoutPage() {
         postalCode: values.postalCode,
         isDefault: false,
       },
-      lines: detailed.map((line) => ({ productId: line.productId, variantId: line.variant?.id ?? line.variantId, quantity: line.quantity })),
+      lines: detailed.map((line) => ({
+        productId: line.productId,
+        variantId: orderLineVariantId(line.product, line.variantId),
+        quantity: line.quantity,
+      })),
       couponCode: values.voucher?.trim() || null,
       shippingMethodId: values.shippingMethodId,
       paymentMethod: values.payment as PaymentMethod,

@@ -62,7 +62,8 @@ export type Product = {
   demoSoldLabel: string
   demoUnitsSold: number
   createdAt: string
-  demo: true
+  /** True only for in-browser demonstration catalogue rows. */
+  demo?: boolean
 }
 
 export type Address = {
@@ -165,7 +166,7 @@ export type Order = {
   proofName: string | null
   latestProofId: string | null
   history: StatusEvent[]
-  demo: true
+  demo?: boolean
 }
 
 export type Banner = {

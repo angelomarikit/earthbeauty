@@ -212,7 +212,7 @@ export function ProductFormPage() {
             />
           </div>
           <div className="whitepanel" style={{ marginTop: 16 }}>
-            <div className="between"><b>Variations</b><button type="button" className="btn outline compact" onClick={() => update('variants', [...form.variants, blankVariant(form)])}>＋ Add variation</button></div>
+            <div className="between"><b>Variations</b><button type="button" className="btn outline compact" onClick={() => update('variants', [...form.variants, blankVariant(form, mode === 'production')])}>＋ Add variation</button></div>
             {form.variants.map((variant, index) => (
               <div key={variant.id} className="grid2" style={{ marginTop: 12 }}>
                 <input className="field-input" value={variant.label} aria-label="Variation name" onChange={(event) => updateVariant(setForm, index, { label: event.target.value })} />
@@ -235,8 +235,16 @@ function updateVariant(setForm: Dispatch<SetStateAction<Product>>, index: number
   }))
 }
 
-function blankVariant(product: Product): Variant {
-  return { id: uid('var'), label: 'New size', sku: `${product.sku}-NEW`, priceCentavos: product.priceCentavos, compareAtCentavos: product.compareAtCentavos, stock: 0, active: true }
+function blankVariant(product: Product, production: boolean): Variant {
+  return {
+    id: production ? entityUuid() : uid('var'),
+    label: 'New size',
+    sku: `${product.sku}-NEW`,
+    priceCentavos: product.priceCentavos,
+    compareAtCentavos: product.compareAtCentavos,
+    stock: 0,
+    active: true,
+  }
 }
 
 function blankProduct(categoryId: string, brandId: string | null, production = false): Product {
@@ -262,7 +270,17 @@ function blankProduct(categoryId: string, brandId: string | null, production = f
     isNew: true,
     bestSeller: false,
     active: true,
-    variants: [{ id: uid('var'), label: 'Standard', sku: `EBW-${id.slice(-4).toUpperCase()}`, priceCentavos: 0, compareAtCentavos: null, stock: 0, active: true }],
+    variants: [
+      {
+        id: production ? entityUuid() : uid('var'),
+        label: 'Standard',
+        sku: `EBW-${id.slice(-4).toUpperCase()}`,
+        priceCentavos: 0,
+        compareAtCentavos: null,
+        stock: 0,
+        active: true,
+      },
+    ],
     demoReviewCount: 0,
     demoSoldLabel: '',
     demoUnitsSold: 0,
