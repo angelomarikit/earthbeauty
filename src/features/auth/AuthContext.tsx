@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { useStore } from '@/features/store/StoreContext'
-import { getSupabase } from '@/lib/supabase'
+import { getSupabase, getSupabaseClient } from '@/lib/supabase'
 import type { DemoUser } from '@/types'
 
 const SESSION_KEY = 'ebw-session-v1'
@@ -15,7 +15,7 @@ type ProductionSession = {
 }
 
 async function loadProductionSession(): Promise<ProductionSession | null> {
-  const supabase = getSupabase()
+  const supabase = getSupabaseClient()
   if (!supabase) return null
   const { data: sessionData } = await supabase.auth.getSession()
   const authUser = sessionData.session?.user
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (mode !== 'production') return
     localStorage.removeItem(SESSION_KEY)
     setUserId(null)
-    const supabase = getSupabase()
+    const supabase = getSupabaseClient()
     if (!supabase) return
     void loadProductionSession().then(setProductionUser)
     const { data: subscription } = supabase.auth.onAuthStateChange(() => {
@@ -69,23 +69,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.subscription.unsubscribe()
   }, [mode])
 
+  useEffect(() => {
+    if (mode !== 'demo') return
+    const supabase = getSupabaseClient()
+    if (!supabase) return
+    void loadProductionSession().then((session) => {
+      if (session) setProductionUser(session)
+    })
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+      void loadProductionSession().then((session) => {
+        setProductionUser(session)
+      })
+    })
+    return () => subscription.subscription.unsubscribe()
+  }, [mode])
+
   const user = useMemo(() => {
-    if (mode === 'production') {
-      if (!productionUser) return null
-      return {
-        id: productionUser.id,
-        name: productionUser.name,
-        email: productionUser.email,
-        phone: productionUser.phone,
-        password: '',
-        role: productionUser.role,
-        memberSince: '2026',
-        addresses: [],
-        demo: true as const,
-      }
-    }
-    const local = state.users.find((entry) => entry.id === userId) ?? null
-    if (local) return local
     if (productionUser) {
       return {
         id: productionUser.id,
@@ -99,39 +98,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         demo: true as const,
       }
     }
-    return null
+    if (mode === 'production') return null
+    const local = state.users.find((entry) => entry.id === userId) ?? null
+    return local
   }, [mode, productionUser, state.users, userId])
 
   const api = useMemo<AuthValue>(
     () => ({
       user,
       login: async (email, password) => {
-        if (mode === 'production') {
-          const supabase = getSupabase()
-          if (!supabase) {
-            return { ok: false, error: 'Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the dev server.', role: null }
-          }
+        const supabase = getSupabaseClient()
+        if (supabase) {
           const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
           if (error) {
             const hint =
               error.message.toLowerCase().includes('invalid') || error.message.toLowerCase().includes('credentials')
-                ? ' If this account was just created, confirm the email in Supabase or enable Auto confirm user.'
+                ? ' Check the password in Supabase Auth and confirm the email (or enable Auto confirm user).'
                 : ''
             return { ok: false, error: `${error.message}${hint}`, role: null }
           }
           const session = await loadProductionSession()
           if (!session) return { ok: false, error: 'Signed in but session could not be loaded. Refresh and try again.', role: null }
           flushSync(() => setProductionUser(session))
+          localStorage.removeItem(SESSION_KEY)
+          setUserId(null)
           return { ok: true, error: null, role: session.role }
         }
+        if (mode === 'production') {
+          return { ok: false, error: 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then rebuild.', role: null }
+        }
         const found = state.users.find((entry) => entry.email.toLowerCase() === email.toLowerCase() && entry.password === password)
-        if (!found) return { ok: false, error: 'Those sign-in details were not recognized.', role: null }
+        if (!found) {
+          return {
+            ok: false,
+            error: 'Those sign-in details were not recognized. This build has no Supabase keys — use a demo account or set production env vars and rebuild.',
+            role: null,
+          }
+        }
         localStorage.setItem(SESSION_KEY, found.id)
         flushSync(() => setUserId(found.id))
         return { ok: true, error: null, role: found.role }
       },
       logout: async () => {
-        if (mode === 'production') await getSupabase()?.auth.signOut()
+        await getSupabaseClient()?.auth.signOut()
         setUserId(null)
         setProductionUser(null)
         localStorage.removeItem(SESSION_KEY)
