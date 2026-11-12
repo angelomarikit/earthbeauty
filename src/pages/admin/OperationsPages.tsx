@@ -1,4 +1,5 @@
 import { AdminAlertModal, AdminConfirmModal } from '@/components/admin/AdminModal'
+import { OrderDetailSummary } from '@/components/admin/OrderDetailSummary'
 import { OrderStatusHistory } from '@/components/admin/OrderStatusHistory'
 import { PaymentSettingsCards } from '@/components/admin/PaymentSettingsCards'
 import { PolicySettingsEditor } from '@/components/admin/PolicySettingsEditor'
@@ -151,40 +152,25 @@ export function OrderAdminDetailPage() {
         <ArrowLeft size={16} aria-hidden />
         Back to orders
       </Link>
-      <div className="eyebrow" style={{ marginTop: 14 }}>ORDER</div>
-      <h1 style={{ font: '31px Georgia, serif' }}>#{order.orderNumber}</h1>
       {mode === 'demo' ? (
-        <div className="notice">Demonstration order. Do not treat the payment state as money received by the business.</div>
+        <div className="notice" style={{ marginTop: 12 }}>Demonstration order. Do not treat the payment state as money received by the business.</div>
       ) : null}
-      <div className="grid2">
-        <div className="whitepanel">
-          <h3>Customer</h3>
-          <p>{order.customerName}<br />{order.email}<br />{order.phone}</p>
-          <p className="muted small" style={{ marginTop: 8 }}>{order.address.street}, {order.address.barangay}, {order.address.city}, {order.address.province}, {order.address.postalCode}</p>
-          <div className="line" />
-          {order.items.map((item) => (
-            <div key={item.sku} className="between" style={{ padding: '8px 0' }}>
-              <span>{item.name} · {item.variantLabel} × {item.quantity}</span>
-              <b>{formatPeso(item.unitPriceCentavos * item.quantity)}</b>
-            </div>
-          ))}
-          <div className="between"><span>Total</span><b>{formatPeso(order.totalCentavos)}</b></div>
-          <p className="small" style={{ marginTop: 8 }}>
-            Payment method: <b>{paymentMethodLabel(order.paymentMethod)}</b> ·{' '}
-            <span className={paymentClass(order.paymentStatus)}>{paymentLabel(order.paymentStatus)}</span>
-          </p>
-          {mode === 'production' && proofs.length ? (
-            <div style={{ marginTop: 12 }}>
-              <p className="small">Latest proof: {proofs[0].fileName} · ref {proofs[0].referenceNumber || '—'}</p>
-              {previewUrl ? <img src={previewUrl} alt="Payment proof" style={{ maxWidth: '100%', marginTop: 8, borderRadius: 8 }} /> : null}
-            </div>
-          ) : order.proofName ? (
-            <p className="small">Proof file name: {order.proofName}</p>
-          ) : (
-            <p className="muted small">No proof of payment attached.</p>
-          )}
+      <div className="order-detail-hero" style={{ marginTop: 14 }}>
+        <div>
+          <div className="eyebrow">ORDER</div>
+          <h1 style={{ font: '31px Georgia, serif', margin: '8px 0' }}>#{order.orderNumber}</h1>
+          <p className="muted small" style={{ margin: 0 }}>Placed {formatDate(order.createdAt)}</p>
         </div>
-        <div className="whitepanel">
+        <div className="order-detail-badges order-detail-badges--hero">
+          <span className={fulfillmentClass(order.fulfillmentStatus)}>{fulfillmentLabel(order.fulfillmentStatus)}</span>
+          <span className={paymentClass(order.paymentStatus)}>{paymentLabel(order.paymentStatus)}</span>
+        </div>
+      </div>
+      <div className="grid2 order-detail-grid">
+        <OrderDetailSummary order={order} mode={mode} proofs={proofs} previewUrl={previewUrl} />
+        <div className="whitepanel order-fulfillment-card">
+          <h3 style={{ marginTop: 0 }}>Fulfillment</h3>
+          <p className="muted tiny" style={{ margin: '0 0 16px', lineHeight: 1.55 }}>Update status, enter the J&amp;T waybill, and save.</p>
           {actionError ? <div className="form-error" style={{ marginBottom: 12 }}>{actionError}</div> : null}
           {mode === 'production' && order.paymentMethod !== 'cod' && order.paymentStatus === 'pending_verification' && proofs.length ? (
             <div className="row" style={{ marginBottom: 16, gap: 8 }}>
@@ -197,7 +183,7 @@ export function OrderAdminDetailPage() {
               MARK COD COLLECTED
             </button>
           ) : null}
-          <label className="fieldlabel">Fulfillment</label>
+          <label className="fieldlabel">Fulfillment status</label>
           <select className="field-input" value={order.fulfillmentStatus} onChange={(event) => updateOrder(order.id, { fulfillmentStatus: event.target.value as FulfillmentStatus, historyNote: 'Fulfillment updated.' })}>
             {fulfillmentOptions.map((option) => <option key={option} value={option}>{fulfillmentLabel(option)}</option>)}
           </select>
