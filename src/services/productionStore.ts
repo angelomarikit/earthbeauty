@@ -12,6 +12,7 @@ import type {
   PackStyle,
   PaymentProof,
   Product,
+  ProductImage,
   ShippingMethod,
   StoreSettings,
 } from '@/types'
@@ -46,8 +47,25 @@ function mapPaymentMethod(value: string): Order['paymentMethod'] {
   return 'cod'
 }
 
+function mapProductImage(row: Row): ProductImage {
+  const sortOrder = asNumber(row.sort_order)
+  return {
+    id: asText(row.id),
+    url: asText(row.url),
+    altText: asText(row.alt_text, ''),
+    sortOrder,
+    isHero: row.is_hero === undefined || row.is_hero === null ? sortOrder === 0 : Boolean(row.is_hero),
+    isThumbnail:
+      row.is_thumbnail === undefined || row.is_thumbnail === null ? sortOrder === 0 : Boolean(row.is_thumbnail),
+  }
+}
+
 function mapProduct(row: Row): Product {
   const variants = Array.isArray(row.product_variants) ? row.product_variants : []
+  const imageRows = Array.isArray(row.product_images) ? row.product_images : []
+  const images = imageRows
+    .map((entry) => mapProductImage(entry as Row))
+    .sort((a, b) => a.sortOrder - b.sortOrder)
   return {
     id: asText(row.id),
     name: asText(row.name),
@@ -65,6 +83,7 @@ function mapProduct(row: Row): Product {
     pack: (asText(row.pack, 'bottle') as PackStyle) || 'bottle',
     gallery: Array.isArray(row.gallery) ? (row.gallery as PackStyle[]) : ['bottle'],
     imageUrl: row.image_url == null ? null : asText(row.image_url),
+    images,
     featured: Boolean(row.featured),
     isNew: Boolean(row.is_new),
     bestSeller: Boolean(row.best_seller),
@@ -253,7 +272,7 @@ export async function loadProductionState(settingsBase?: StoreSettings): Promise
   const [categories, brands, products, orders, settings, shipping, coupons, banners] = await Promise.all([
     supabase.from('categories').select('*').order('sort_order'),
     supabase.from('brands').select('*').order('sort_order'),
-    supabase.from('products').select('*, product_variants(*)').order('created_at', { ascending: false }),
+    supabase.from('products').select('*, product_variants(*), product_images(*)').order('created_at', { ascending: false }),
     supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }),
     supabase.from('store_settings').select('*').limit(1).maybeSingle(),
     supabase.from('shipping_methods').select('*').order('name'),
@@ -402,6 +421,41 @@ export async function productionSave(kind: string, payload: unknown) {
       active: product.active,
     })
     if (productError) throw new Error(productError.message)
+    const savedImageIds = new Set<string>()
+    for (let index = 0; index < product.images.length; index++) {
+      const image = product.images[index]
+      const imageId = isUuid(image.id) ? image.id : entityUuid()
+      savedImageIds.add(imageId)
+      const { error: imageError } = await supabase.from('product_images').upsert({
+        id: imageId,
+        product_id: product.id,
+        url: image.url,
+        alt_text: image.altText || product.name,
+        sort_order: index,
+        is_hero: image.isHero,
+        is_thumbnail: image.isThumbnail,
+      })
+      if (imageError) {
+        if (/is_hero|is_thumbnail/i.test(imageError.message)) {
+          throw new Error(
+            `${imageError.message} Run supabase/migrations/0010_product_image_roles.sql in the Supabase SQL Editor.`,
+          )
+        }
+        throw new Error(imageError.message)
+      }
+    }
+    const { data: existingImages, error: listImagesError } = await supabase
+      .from('product_images')
+      .select('id')
+      .eq('product_id', product.id)
+    if (listImagesError) throw new Error(listImagesError.message)
+    for (const row of existingImages ?? []) {
+      const rowId = asText((row as Row).id)
+      if (!savedImageIds.has(rowId)) {
+        const { error: deleteError } = await supabase.from('product_images').delete().eq('id', rowId)
+        if (deleteError) throw new Error(deleteError.message)
+      }
+    }
     const variants =
       product.variants.length > 0
         ? product.variants
@@ -635,6 +689,38 @@ export async function productionFetchOrderProofs(orderId: string): Promise<Payme
     attemptNumber: asNumber(row.attempt_number),
     createdAt: asText(row.created_at),
   }))
+}
+
+function mapTrackOrderPayload(payload: Row): Order | null {
+  const orderRow = payload.order as Row | undefined
+  if (!orderRow) return null
+  const items = Array.isArray(payload.items) ? payload.items : []
+  const historyRows = Array.isArray(payload.history) ? payload.history : []
+  const base = mapOrder({ ...orderRow, order_items: items })
+  return {
+    ...base,
+    history: historyRows.map((row) => {
+      const event = row as Row
+      return {
+        at: asText(event.at),
+        fulfillment: (asText(event.fulfillment, 'pending') as Order['fulfillmentStatus']) || 'pending',
+        payment: (asText(event.payment, 'unpaid') as Order['paymentStatus']) || 'unpaid',
+        note: asText(event.note, ''),
+      }
+    }),
+  }
+}
+
+export async function productionTrackOrder(orderNumber: string, email: string): Promise<Order | null> {
+  const supabase = getSupabase()
+  if (!supabase) return null
+  const { data, error } = await supabase.rpc('track_order', {
+    p_order_number: orderNumber.trim(),
+    p_email: email.trim(),
+  })
+  if (error) throw new Error(error.message.includes('track_order') ? `${error.message} Run supabase/migrations/0011_track_order_rpc.sql.` : error.message)
+  if (!data || typeof data !== 'object') return null
+  return mapTrackOrderPayload(data as Row)
 }
 
 export async function productionFetchOrderById(orderId: string): Promise<Order | null> {

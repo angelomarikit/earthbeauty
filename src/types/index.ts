@@ -26,6 +26,17 @@ export type Brand = {
   blurb: string
 }
 
+export type ProductImage = {
+  id: string
+  url: string
+  altText: string
+  sortOrder: number
+  /** Large image on the product detail page */
+  isHero: boolean
+  /** Small image on shop cards, cart, and checkout */
+  isThumbnail: boolean
+}
+
 export type Variant = {
   id: string
   label: string
@@ -53,6 +64,7 @@ export type Product = {
   pack: PackStyle
   gallery: PackStyle[]
   imageUrl: string | null
+  images: ProductImage[]
   featured: boolean
   isNew: boolean
   bestSeller: boolean

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { BrandLogo } from '@/components/branding/BrandLogo'
 import { PackArt } from '@/components/product/ProductCard'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -7,8 +7,12 @@ import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { formatDate, formatPeso, fulfillmentClass, fulfillmentLabel } from '@/lib/format'
 import { usePageMeta } from '@/lib/seo'
+import { JntTrackingPanel } from '@/components/storefront/JntTrackingPanel'
+import { isJntShipping } from '@/lib/jntTracking'
+import { paymentMethodLabel } from '@/lib/paymentMethods'
+import { productionTrackOrder } from '@/services/productionStore'
 import { PhilippinesAddressFields } from '@/components/forms/PhilippinesAddressFields'
-import type { Address } from '@/types'
+import type { Address, Order } from '@/types'
 
 export function AccountPage() {
   const { user, logout } = useAuth()
@@ -202,17 +206,69 @@ export function WishlistPage() {
 }
 
 export function TrackLookupPage() {
-  const [number, setNumber] = useState('EBW-2026-1024')
+  const { mode } = useStore()
+  const [number, setNumber] = useState(mode === 'production' ? '' : 'EBW-2026-1024')
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  usePageMeta('Track Order · Earth Beauty & Wellness', 'Look up a demonstration order.')
+  usePageMeta(
+    'Track Order · Earth Beauty & Wellness',
+    mode === 'production' ? 'Look up your order status and courier tracking.' : 'Look up a demonstration order.',
+  )
   return (
     <div className="page">
       <div className="wrap" style={{ maxWidth: 640 }}>
         <h1 className="page-title">Track Your Order</h1>
-        <p className="muted" style={{ margin: '10px 0 18px' }}>Enter an order number from this browser preview. Sample number: EBW-2026-1024.</p>
-        <form className="row" onSubmit={(event) => { event.preventDefault(); navigate(`/orders/${number.trim()}`) }}>
-          <input className="field-input" value={number} onChange={(event) => setNumber(event.target.value)} aria-label="Order number" />
-          <button className="btn" type="submit">TRACK</button>
+        <p className="muted" style={{ margin: '10px 0 18px', lineHeight: 1.55 }}>
+          {mode === 'production'
+            ? 'Enter your order number and the email address you used at checkout.'
+            : 'Enter an order number from this browser preview. Sample: EBW-2026-1024 (no email required).'}
+        </p>
+        {error ? <div className="form-error" style={{ marginBottom: 14 }}>{error}</div> : null}
+        <form
+          className="track-lookup-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const trimmed = number.trim()
+            if (!trimmed) return setError('Enter your order number.')
+            void (async () => {
+              if (mode === 'production') {
+                if (!email.trim()) return setError('Enter the email from your order.')
+                setLoading(true)
+                setError(null)
+                try {
+                  const order = await productionTrackOrder(trimmed, email)
+                  if (!order) {
+                    setError('No order matches that number and email. Double-check both fields.')
+                    return
+                  }
+                  sessionStorage.setItem(`track-email:${trimmed.toUpperCase()}`, email.trim().toLowerCase())
+                  navigate(`/orders/${encodeURIComponent(trimmed)}`, { state: { trackedOrder: order } })
+                } catch (reason: unknown) {
+                  setError(reason instanceof Error ? reason.message : 'Could not look up that order.')
+                } finally {
+                  setLoading(false)
+                }
+                return
+              }
+              navigate(`/orders/${encodeURIComponent(trimmed)}`)
+            })()
+          }}
+        >
+          <label className="fieldlabel" htmlFor="track-order-number">Order number</label>
+          <input id="track-order-number" className="field-input" value={number} onChange={(event) => setNumber(event.target.value)} aria-label="Order number" placeholder="EBW-2026-1100" />
+          {mode === 'production' ? (
+            <>
+              <label className="fieldlabel" htmlFor="track-email" style={{ marginTop: 14 }}>
+                Email at checkout
+              </label>
+              <input id="track-email" className="field-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" />
+            </>
+          ) : null}
+          <button className="btn" type="submit" style={{ marginTop: 16 }} disabled={loading}>
+            {loading ? 'LOOKING UP…' : 'TRACK'}
+          </button>
         </form>
       </div>
     </div>
@@ -221,12 +277,48 @@ export function TrackLookupPage() {
 
 export function OrderTrackingPage() {
   const { orderNumber } = useParams()
-  const { state } = useStore()
+  const location = useLocation()
+  const { state, mode } = useStore()
   const { user } = useAuth()
-  const order = state.orders.find((entry) => entry.orderNumber === orderNumber)
+  const trackedFromNav = (location.state as { trackedOrder?: Order } | null)?.trackedOrder ?? null
+  const [fetched, setFetched] = useState<Order | null>(trackedFromNav)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const fromStore = orderNumber ? state.orders.find((entry) => entry.orderNumber === orderNumber) : undefined
+  const order = fromStore ?? fetched
+
+  useEffect(() => {
+    if (fromStore || !orderNumber || mode !== 'production') return
+    const email = sessionStorage.getItem(`track-email:${orderNumber.toUpperCase()}`)
+    if (!email) return
+    setLoading(true)
+    setLoadError(null)
+    void productionTrackOrder(orderNumber, email)
+      .then((result) => {
+        if (result) setFetched(result)
+        else setLoadError('Order not found. Use Track Your Order with your email.')
+      })
+      .catch((reason: unknown) => {
+        setLoadError(reason instanceof Error ? reason.message : 'Could not load this order.')
+      })
+      .finally(() => setLoading(false))
+  }, [fromStore, mode, orderNumber])
   usePageMeta(order ? `${order.orderNumber} · Earth Beauty & Wellness` : 'Order', 'Order tracking')
+  if (!orderNumber) {
+    return <div className="page"><div className="wrap empty whitepanel">Missing order number.</div></div>
+  }
+  if (loading && !order) {
+    return <div className="page"><div className="wrap whitepanel"><p className="muted">Loading order…</p></div></div>
+  }
   if (!order) {
-    return <div className="page"><div className="wrap empty whitepanel">No order matches that number in this preview.</div></div>
+    return (
+      <div className="page">
+        <div className="wrap empty whitepanel">
+          <p>{loadError ?? (mode === 'production' ? 'Look up your order from Track Your Order with your checkout email.' : 'No order matches that number in this preview.')}</p>
+          <Link to="/track" className="btn outline" style={{ marginTop: 16 }}>BACK TO TRACK</Link>
+        </div>
+      </div>
+    )
   }
   const owns = !user || user.role === 'admin' || user.email.toLowerCase() === order.email.toLowerCase() || user.id === order.customerId
   if (user && !owns) return <div className="page"><div className="wrap empty whitepanel">This order belongs to another account.</div></div>
@@ -234,13 +326,15 @@ export function OrderTrackingPage() {
     { key: 'pending', label: 'Order Placed', done: true },
     { key: 'confirmed', label: 'Confirmed', done: ['confirmed', 'processing', 'shipped', 'delivered'].includes(order.fulfillmentStatus) },
     { key: 'processing', label: 'Preparing', done: ['processing', 'shipped', 'delivered'].includes(order.fulfillmentStatus) },
+    { key: 'shipped', label: 'With courier', done: ['shipped', 'delivered'].includes(order.fulfillmentStatus) },
     { key: 'delivered', label: 'Delivered', done: order.fulfillmentStatus === 'delivered' },
   ]
   const latest = order.history[order.history.length - 1]
+  const showJnt = isJntShipping(order.shippingMethodName) && Boolean(order.trackingNumber?.trim())
   return (
     <div className="page">
       <div className="wrap">
-        <div className="breadcrumb"><Link to="/">Home</Link> / <Link to="/account?tab=orders">My Orders</Link> / <b>Track Order</b></div>
+        <div className="breadcrumb"><Link to="/">Home</Link> / <Link to="/track">Track order</Link> / <b>{order.orderNumber}</b></div>
         <div className="section-title">
           <div>
             <div className="eyebrow">SHOP WITH CONFIDENCE</div>
@@ -248,7 +342,7 @@ export function OrderTrackingPage() {
           </div>
           <Link to="/contact">CONTACT SUPPORT →</Link>
         </div>
-        <div className="notice">Timeline reflects demonstration status updates, not a live courier.</div>
+        {mode === 'demo' ? <div className="notice">Timeline reflects demonstration status updates, not a live courier.</div> : null}
         <div className="whitepanel">
           <div className="between">
             <div>
@@ -296,12 +390,13 @@ export function OrderTrackingPage() {
             <p className="small">{order.shippingMethodName}</p>
             <div className="line" />
             <div className="small muted">PAYMENT</div>
-            <p className="small">{order.paymentMethod === 'gcash' ? 'GCash — awaiting manual verification' : order.paymentMethod === 'cod' ? 'Cash on delivery — simulated' : order.paymentMethod}</p>
+            <p className="small">{paymentMethodLabel(order.paymentMethod)}</p>
             <div className="line" />
             <div className="small muted">TRACKING NUMBER</div>
             <p className="small">{order.trackingNumber || 'To be assigned by the store'}</p>
           </div>
         </div>
+        {showJnt ? <JntTrackingPanel billCode={order.trackingNumber} /> : null}
       </div>
     </div>
   )

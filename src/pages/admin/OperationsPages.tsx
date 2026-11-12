@@ -2,6 +2,7 @@ import { AdminAlertModal, AdminConfirmModal } from '@/components/admin/AdminModa
 import { OrderStatusHistory } from '@/components/admin/OrderStatusHistory'
 import { PaymentSettingsCards } from '@/components/admin/PaymentSettingsCards'
 import { PolicySettingsEditor } from '@/components/admin/PolicySettingsEditor'
+import { ArrowLeft } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useStore } from '@/features/store/StoreContext'
@@ -133,10 +134,24 @@ export function OrderAdminDetailPage() {
     }
   }
 
-  if (!order) return <div className="whitepanel">Order not found.</div>
+  if (!order) {
+    return (
+      <div className="whitepanel">
+        <p>Order not found.</p>
+        <Link to="/admin/orders" className="admin-back-link" style={{ marginTop: 14 }}>
+          <ArrowLeft size={16} aria-hidden />
+          Back to orders
+        </Link>
+      </div>
+    )
+  }
   return (
     <>
-      <div className="eyebrow">ORDER</div>
+      <Link to="/admin/orders" className="admin-back-link">
+        <ArrowLeft size={16} aria-hidden />
+        Back to orders
+      </Link>
+      <div className="eyebrow" style={{ marginTop: 14 }}>ORDER</div>
       <h1 style={{ font: '31px Georgia, serif' }}>#{order.orderNumber}</h1>
       {mode === 'demo' ? (
         <div className="notice">Demonstration order. Do not treat the payment state as money received by the business.</div>

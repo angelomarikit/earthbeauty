@@ -5,6 +5,7 @@ import { brandName, cartVariantId, comparePrice, findVariant, unitPrice } from '
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { formatPeso } from '@/lib/format'
+import { productThumbnailUrl } from '@/lib/productImages'
 import type { PackStyle, Product } from '@/types'
 
 export function PackArt({ type }: { type: PackStyle }) {
@@ -36,12 +37,13 @@ export function ProductCard({ product }: { product: Product }) {
   const variant = findVariant(product, null)
   const canAdd = Boolean(variant)
   const wished = saved.includes(product.id)
+  const thumb = productThumbnailUrl(product)
 
   return (
     <article className="product">
       <div className="pimg">
         <Link to={`/product/${product.slug}`} className="pimg-inner" aria-label={product.name}>
-          {product.imageUrl ? <img src={product.imageUrl} alt="" /> : <PackArt type={product.pack} />}
+          {thumb ? <img src={thumb} alt="" /> : <PackArt type={product.pack} />}
         </Link>
         {product.badge ? <span className="flag">{product.badge}</span> : null}
         <button

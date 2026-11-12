@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AdminConfirmModal, AdminTextPromptModal } from '@/components/admin/AdminModal'
+import { ProductImagesEditor } from '@/components/admin/ProductImagesEditor'
 import { FileUploadField } from '@/components/forms/FileUploadField'
 import { PackArt } from '@/components/product/ProductCard'
 import { brandName, categoryName } from '@/features/catalog/pricing'
 import { useStore } from '@/features/store/StoreContext'
 import { entityUuid, formatPeso, slugify, uid } from '@/lib/format'
+import { normalizeProductImages, productThumbnailUrl, syncProductImageUrl } from '@/lib/productImages'
 import { uploadBrandLogo, uploadCategoryImage, uploadProductImage } from '@/services/storageUpload'
 import type { Brand, Category, Product, Variant } from '@/types'
 
@@ -57,7 +59,7 @@ export function ProductsAdminPage() {
             <tbody>
               {products.map((product) => (
                 <tr key={product.id}>
-                  <td><div className="thumb" style={{ width: 54, height: 54 }}>{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <PackArt type={product.pack} />}</div></td>
+                  <td><div className="thumb" style={{ width: 54, height: 54 }}>{productThumbnailUrl(product) ? <img src={productThumbnailUrl(product)!} alt="" /> : <PackArt type={product.pack} />}</div></td>
                   <td><b>{product.name}</b></td>
                   <td>{product.sku}</td>
                   <td className="small">{brandName(state, product.brandId, '—')}</td>
@@ -103,14 +105,16 @@ export function ProductFormPage() {
   const { state, saveProduct, mode } = useStore()
   const navigate = useNavigate()
   const existing = state.products.find((product) => product.id === id)
-  const [form, setForm] = useState<Product>(() => existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null, mode === 'production'))
+  const [form, setForm] = useState<Product>(() =>
+    normalizeProductImages(existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null, mode === 'production')),
+  )
   useEffect(() => {
-    setForm(existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null, mode === 'production'))
+    setForm(normalizeProductImages(existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null, mode === 'production')))
     // Reload the form only when the route changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
   const [error, setError] = useState<string | null>(null)
-  const [pendingImage, setPendingImage] = useState<File | null>(null)
+  const [pendingImages, setPendingImages] = useState<Record<string, File>>({})
   const [saving, setSaving] = useState(false)
 
   function update<K extends keyof Product>(key: K, value: Product[K]) {
@@ -125,26 +129,37 @@ export function ProductFormPage() {
           if (!form.name.trim()) return setError('Enter a product name.')
           if (!form.categoryId) return setError('Choose a category.')
           if (!form.brandId) return setError('Choose a brand.')
-          const slug = slugify(form.slug || form.name)
-          if (state.products.some((product) => product.slug === slug && product.id !== form.id)) return setError('That link is already used.')
+          const slug = slugify(form.name)
+          if (!slug) return setError('Enter a product name.')
+          if (state.products.some((product) => product.slug === slug && product.id !== form.id)) return setError('Another product already uses this name.')
           const variants = form.variants.map((variant) => ({ ...variant, stock: Math.max(0, variant.stock), priceCentavos: Math.max(0, variant.priceCentavos) }))
           const stock = variants.reduce((sum, variant) => sum + variant.stock, 0)
           setSaving(true)
           setError(null)
           try {
-            let imageUrl = form.imageUrl
-            if (mode === 'production' && pendingImage) {
-              imageUrl = await uploadProductImage(pendingImage, form.id)
+            let images = form.images.map((image, index) => ({ ...image, sortOrder: index, altText: image.altText || form.name }))
+            if (mode === 'production') {
+              images = await Promise.all(
+                images.map(async (image) => {
+                  const pending = pendingImages[image.id]
+                  if (!pending) return image
+                  const url = await uploadProductImage(pending, form.id)
+                  return { ...image, url }
+                }),
+              )
             }
-            saveProduct({
+            if (images.length && !images.some((image) => image.isHero)) images[0] = { ...images[0], isHero: true }
+            if (images.length && !images.some((image) => image.isThumbnail)) images[0] = { ...images[0], isThumbnail: true }
+            const product = syncProductImageUrl({
               ...form,
               slug,
               variants,
               stock,
-              imageUrl,
+              images,
               priceCentavos: variants[0]?.priceCentavos ?? form.priceCentavos,
               demo: true,
             })
+            saveProduct(product)
             navigate('/admin/products')
           } catch (reason: unknown) {
             setError(reason instanceof Error ? reason.message : 'Could not save the product.')
@@ -161,8 +176,8 @@ export function ProductFormPage() {
       {error ? <div className="form-error" style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: '#fff5f8' }}>{error}</div> : null}
       <div className="grid2">
         <div className="whitepanel">
-          <Field label="Product name"><input className="field-input" value={form.name} onChange={(event) => { update('name', event.target.value); if (!existing) update('slug', slugify(event.target.value)) }} /></Field>
-          <Field label="Slug"><input className="field-input" value={form.slug} onChange={(event) => update('slug', slugify(event.target.value))} /></Field>
+          <Field label="Product name"><input className="field-input" value={form.name} onChange={(event) => update('name', event.target.value)} /></Field>
+          <p className="muted tiny" style={{ margin: '-4px 0 12px' }}>The shop link is generated automatically from the product name.</p>
           <Field label="Description"><textarea className="field-input" value={form.description} onChange={(event) => update('description', event.target.value)} /></Field>
           <Field label="Category">
             <select className="field-input" value={form.categoryId} onChange={(event) => update('categoryId', event.target.value)}>
@@ -188,37 +203,38 @@ export function ProductFormPage() {
         </div>
         <div>
           <div className="whitepanel">
-            <div className="fieldlabel">Product image</div>
-            <div className="pimg" style={{ borderRadius: 10 }}>{form.imageUrl ? <img src={form.imageUrl} alt="" /> : <PackArt type={form.pack} />}</div>
-            <FileUploadField
-              buttonLabel="Upload product image"
-              fileName={pendingImage?.name ?? (form.imageUrl ? 'Image selected' : null)}
-              hint="JPG, PNG, or WebP · max 5 MB in production"
-              onChange={(file) => {
-                if (!file) return
-                if (mode === 'production') {
-                  setPendingImage(file)
-                  update('imageUrl', URL.createObjectURL(file))
-                  return
-                }
-                if (file.size > 400_000) {
-                  setError('Choose an image under 400 KB for this browser preview.')
-                  return
-                }
-                const reader = new FileReader()
-                reader.onload = () => update('imageUrl', String(reader.result))
-                reader.readAsDataURL(file)
-              }}
+            <ProductImagesEditor
+              images={form.images}
+              pack={form.pack}
+              production={mode === 'production'}
+              onChange={(images) => update('images', images)}
+              onPickFile={(imageId, file) => setPendingImages((current) => ({ ...current, [imageId]: file }))}
+              onTooLarge={() => setError('Choose an image under 400 KB for this browser preview.')}
             />
           </div>
           <div className="whitepanel" style={{ marginTop: 16 }}>
-            <div className="between"><b>Variations</b><button type="button" className="btn outline compact" onClick={() => update('variants', [...form.variants, blankVariant(form, mode === 'production')])}>＋ Add variation</button></div>
+            <div className="between">
+              <b>Variations</b>
+              <button type="button" className="btn outline compact" onClick={() => update('variants', [...form.variants, blankVariant(form, mode === 'production')])}>＋ Add variation</button>
+            </div>
+            <p className="muted small" style={{ margin: '10px 0 16px', lineHeight: 1.55 }}>
+              A variation is a sellable option for this product (for example <b>Standard</b> or a size). The <b>units in stock</b> field is how many
+              you have for that variation — that is what shoppers can buy. Total stock on the product list is the sum of all variation stocks.
+            </p>
             {form.variants.map((variant, index) => (
-              <div key={variant.id} className="grid2" style={{ marginTop: 12 }}>
-                <input className="field-input" value={variant.label} aria-label="Variation name" onChange={(event) => updateVariant(setForm, index, { label: event.target.value })} />
-                <input className="field-input" type="number" min={0} value={variant.priceCentavos / 100} aria-label="Variation price" onChange={(event) => updateVariant(setForm, index, { priceCentavos: Math.round(Number(event.target.value) * 100) })} />
-                <input className="field-input" value={variant.sku} aria-label="Variation SKU" onChange={(event) => updateVariant(setForm, index, { sku: event.target.value })} />
-                <input className="field-input" type="number" min={0} value={variant.stock} aria-label="Variation stock" onChange={(event) => updateVariant(setForm, index, { stock: Math.max(0, Number(event.target.value)) })} />
+              <div key={variant.id} className="variation-row" style={{ marginTop: index ? 14 : 0 }}>
+                <Field label="Variation name">
+                  <input className="field-input" value={variant.label} onChange={(event) => updateVariant(setForm, index, { label: event.target.value })} />
+                </Field>
+                <Field label="Sale price (₱)">
+                  <input className="field-input" type="number" min={0} value={variant.priceCentavos / 100} onChange={(event) => updateVariant(setForm, index, { priceCentavos: Math.round(Number(event.target.value) * 100) })} />
+                </Field>
+                <Field label="SKU">
+                  <input className="field-input" value={variant.sku} onChange={(event) => updateVariant(setForm, index, { sku: event.target.value })} />
+                </Field>
+                <Field label="Units in stock">
+                  <input className="field-input" type="number" min={0} value={variant.stock} onChange={(event) => updateVariant(setForm, index, { stock: Math.max(0, Number(event.target.value)) })} />
+                </Field>
               </div>
             ))}
           </div>
@@ -266,6 +282,7 @@ function blankProduct(categoryId: string, brandId: string | null, production = f
     pack: 'bottle',
     gallery: ['bottle', 'jar', 'tube', 'tall'],
     imageUrl: null,
+    images: [],
     featured: false,
     isNew: true,
     bestSeller: false,

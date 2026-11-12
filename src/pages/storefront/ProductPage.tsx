@@ -1,11 +1,12 @@
 import { Heart, ShoppingBag, Truck } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PackArt, PriceDisplay, ProductGrid } from '@/components/product/ProductCard'
 import { availableStock, brandName, cartVariantId, comparePrice, findProduct, findVariant, unitPrice } from '@/features/catalog/pricing'
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { usePageMeta } from '@/lib/seo'
+import { productHeroUrl } from '@/lib/productImages'
 export function ProductPage() {
   const { slug } = useParams()
   const { state, mode } = useStore()
@@ -17,6 +18,7 @@ export function ProductPage() {
   const [qty, setQty] = useState(1)
   const [tab, setTab] = useState<'description' | 'use' | 'shipping'>('description')
   const [message, setMessage] = useState<string | null>(null)
+  const [galleryUrl, setGalleryUrl] = useState<string | null>(null)
   const category = state.categories.find((entry) => entry.id === product?.categoryId)
   const supplierBrand = product ? brandName(state, product.brandId, state.settings.legalName) : state.settings.legalName
   const variant = product ? findVariant(product, variantId) : null
@@ -24,6 +26,13 @@ export function ProductPage() {
   const wished = product ? saved.includes(product.id) : false
 
   usePageMeta(product ? `${product.name} · ${supplierBrand}` : 'Product', product?.description ?? 'Product')
+
+  const heroUrl = product ? productHeroUrl(product) : null
+  const gallery = product?.images.filter((image) => image.url) ?? []
+
+  useEffect(() => {
+    setGalleryUrl(heroUrl)
+  }, [product?.id, heroUrl])
 
   const related = useMemo(() => {
     if (!product) return []
@@ -67,10 +76,24 @@ export function ProductPage() {
         </div>
         <div className="detail-grid">
           <div>
-            <div className={`pimg gallery-main ${product.imageUrl ? 'photo' : ''}`}>
-              {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <PackArt type={product.pack} />}
+            <div className={`pimg gallery-main ${galleryUrl ? 'photo' : ''}`}>
+              {galleryUrl ? <img src={galleryUrl} alt={product.name} /> : <PackArt type={product.pack} />}
               {product.badge ? <span className="flag">{product.badge === 'BEST' ? 'BEST SELLER' : product.badge}</span> : null}
             </div>
+            {gallery.length > 1 ? (
+              <div className="product-gallery-thumbs">
+                {gallery.map((image) => (
+                  <button
+                    key={image.id}
+                    type="button"
+                    className={`thumb product-gallery-thumbs__btn${galleryUrl === image.url ? ' on' : ''}`}
+                    onClick={() => setGalleryUrl(image.url)}
+                  >
+                    <img src={image.url} alt="" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div>
             <div className="eyebrow">{supplierBrand} · {category?.name.toUpperCase()}</div>

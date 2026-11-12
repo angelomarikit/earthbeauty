@@ -139,6 +139,7 @@ const products: Product[] = drafts.map((draft, index) => {
     pack: draft.pack,
     gallery: [draft.pack, ...galleryCycle.filter((item) => item !== draft.pack)].slice(0, 4),
     imageUrl: null,
+    images: [],
     featured: Boolean(draft.featured),
     isNew: Boolean(draft.isNew),
     bestSeller: Boolean(draft.bestSeller),
