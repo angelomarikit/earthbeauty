@@ -18,7 +18,7 @@ export function LoginPage() {
   const [params] = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const form = useForm({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } })
-  usePageMeta('Sign in · Earth Beauty & Wellness', 'Sign in to the demonstration store.')
+  usePageMeta('Sign in · Earth Beauty & Wellness', 'Sign in to your account.')
   return (
     <div className="page">
       <div className="wrap" style={{ maxWidth: 520 }}>
@@ -26,14 +26,15 @@ export function LoginPage() {
           <div className="auth-logo"><BrandLogo size="lg" variant="light" priority /></div>
           <div className="eyebrow">ACCOUNT</div>
           <h1 className="page-title">Sign in</h1>
-          <div className="notice" style={{ marginTop: 16 }}>
-            Demonstration sign-in. Customer: alexandra@example.com / demo1234. Admin: admin@earthbeauty.demo / demo-admin.
-          </div>
           <form
+            style={{ marginTop: 16 }}
             onSubmit={form.handleSubmit(async (values) => {
               const result = await login(values.email, values.password)
-              if (result) setError(result)
-              else navigate(params.get('next') || '/account')
+              if (result.error) setError(result.error)
+              else {
+                const next = params.get('next') || (result.role === 'admin' ? '/admin' : '/account')
+                navigate(next)
+              }
             })}
           >
             <div className="form-group"><label className="fieldlabel">Email</label><input className="field-input" {...form.register('email')} /></div>
