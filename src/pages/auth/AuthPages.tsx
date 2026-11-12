@@ -30,11 +30,12 @@ export function LoginPage() {
             style={{ marginTop: 16 }}
             onSubmit={form.handleSubmit(async (values) => {
               const result = await login(values.email, values.password)
-              if (!result.ok) setError(result.error)
-              else {
-                const next = params.get('next') || (result.role === 'admin' ? '/admin' : '/account')
-                navigate(next)
+              if (!result.ok || !result.role) {
+                setError(result.error ?? 'Sign-in failed.')
+                return
               }
+              const next = params.get('next') || (result.role === 'admin' ? '/admin' : '/account')
+              navigate(next)
             })}
           >
             <div className="form-group"><label className="fieldlabel">Email</label><input className="field-input" {...form.register('email')} /></div>

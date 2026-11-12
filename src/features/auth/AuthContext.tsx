@@ -35,9 +35,11 @@ async function loadProductionSession(): Promise<ProductionSession | null> {
   }
 }
 
-export type LoginResult =
-  | { ok: false; error: string }
-  | { ok: true; role: DemoUser['role'] }
+export type LoginResult = {
+  ok: boolean
+  error: string | null
+  role: DemoUser['role'] | null
+}
 
 type AuthValue = {
   user: DemoUser | null
@@ -106,25 +108,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (email, password) => {
         if (mode === 'production') {
           const supabase = getSupabase()
-          if (!supabase) return { ok: false, error: 'Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the dev server.' }
+          if (!supabase) {
+            return { ok: false, error: 'Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the dev server.', role: null }
+          }
           const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
           if (error) {
             const hint =
               error.message.toLowerCase().includes('invalid') || error.message.toLowerCase().includes('credentials')
                 ? ' If this account was just created, confirm the email in Supabase or enable Auto confirm user.'
                 : ''
-            return { ok: false, error: `${error.message}${hint}` }
+            return { ok: false, error: `${error.message}${hint}`, role: null }
           }
           const session = await loadProductionSession()
-          if (!session) return { ok: false, error: 'Signed in but session could not be loaded. Refresh and try again.' }
+          if (!session) return { ok: false, error: 'Signed in but session could not be loaded. Refresh and try again.', role: null }
           flushSync(() => setProductionUser(session))
-          return { ok: true, role: session.role }
+          return { ok: true, error: null, role: session.role }
         }
         const found = state.users.find((entry) => entry.email.toLowerCase() === email.toLowerCase() && entry.password === password)
-        if (!found) return { ok: false, error: 'Those sign-in details were not recognized.' }
+        if (!found) return { ok: false, error: 'Those sign-in details were not recognized.', role: null }
         localStorage.setItem(SESSION_KEY, found.id)
         flushSync(() => setUserId(found.id))
-        return { ok: true, role: found.role }
+        return { ok: true, error: null, role: found.role }
       },
       logout: async () => {
         if (mode === 'production') await getSupabase()?.auth.signOut()
