@@ -7,7 +7,7 @@ import { brandName, categoryName } from '@/features/catalog/pricing'
 import { useStore } from '@/features/store/StoreContext'
 import { entityUuid, formatPeso, slugify, uid } from '@/lib/format'
 import { uploadBrandLogo, uploadCategoryImage, uploadProductImage } from '@/services/storageUpload'
-import type { Brand, Category, PackStyle, Product, Variant } from '@/types'
+import type { Brand, Category, Product, Variant } from '@/types'
 
 export function ProductsAdminPage() {
   const { state, saveProduct, deleteProduct, mode } = useStore()
@@ -210,14 +210,6 @@ export function ProductFormPage() {
                 reader.readAsDataURL(file)
               }}
             />
-            <Field label="Illustration">
-              <select className="field-input" value={form.pack} onChange={(event) => update('pack', event.target.value as PackStyle)}>
-                <option value="bottle">Bottle</option>
-                <option value="jar">Jar</option>
-                <option value="tall">Tall bottle</option>
-                <option value="tube">Tube</option>
-              </select>
-            </Field>
           </div>
           <div className="whitepanel" style={{ marginTop: 16 }}>
             <div className="between"><b>Variations</b><button type="button" className="btn outline compact" onClick={() => update('variants', [...form.variants, blankVariant(form)])}>＋ Add variation</button></div>
