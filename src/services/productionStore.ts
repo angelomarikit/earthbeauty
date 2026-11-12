@@ -402,7 +402,21 @@ export async function productionSave(kind: string, payload: unknown) {
       active: product.active,
     })
     if (productError) throw new Error(productError.message)
-    for (const variant of product.variants) {
+    const variants =
+      product.variants.length > 0
+        ? product.variants
+        : [
+            {
+              id: entityUuid(),
+              label: 'Standard',
+              sku: product.sku,
+              priceCentavos: product.priceCentavos,
+              compareAtCentavos: product.compareAtCentavos,
+              stock: product.stock,
+              active: true,
+            },
+          ]
+    for (const variant of variants) {
       const variantId = isUuid(variant.id) ? variant.id : entityUuid()
       const { error } = await supabase.from('product_variants').upsert({
         id: variantId,
@@ -552,6 +566,7 @@ export async function productionPlaceOrder(input: PlaceOrderPayload): Promise<st
 
 export async function productionSubmitPaymentProof(payload: {
   orderId: string
+  email: string
   storagePath: string
   referenceNumber: string
   fileName: string
@@ -562,6 +577,7 @@ export async function productionSubmitPaymentProof(payload: {
   const { error } = await supabase.rpc('submit_payment_proof', {
     payload: {
       order_id: payload.orderId,
+      email: payload.email,
       storage_path: payload.storagePath,
       reference_number: payload.referenceNumber,
       file_name: payload.fileName,

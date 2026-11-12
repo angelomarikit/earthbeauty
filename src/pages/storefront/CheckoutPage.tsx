@@ -180,10 +180,6 @@ export function CheckoutPage() {
       setFormError('Your cart is empty.')
       return
     }
-    if (mode === 'production' && !user) {
-      setFormError('Sign in to place an order.')
-      return
-    }
     if (!deliveryOptions.length) {
       setFormError('Select your region to see J&T Express rates, or choose store pickup.')
       return
@@ -267,8 +263,8 @@ export function CheckoutPage() {
           <div className="notice">Demonstration checkout. Cash on delivery and manual e-wallet payments are simulated. No payment is processed.</div>
         ) : !user ? (
           <div className="notice">
-            Sign in before checkout so your order and payment proof are linked to your account.{' '}
-            <Link to="/login?next=/checkout" style={{ fontWeight: 700 }}>Sign in</Link>
+            Guest checkout — no account required.{' '}
+            <Link to="/login?next=/checkout" style={{ fontWeight: 700 }}>Sign in</Link> to save orders to your account.
           </div>
         ) : null}
         {!detailed.length ? (
@@ -470,15 +466,10 @@ export function CheckoutPage() {
                 className="btn wide"
                 style={{ marginTop: 25 }}
                 type="submit"
-                disabled={submitting || !deliveryOptions.length || (mode === 'production' && !user)}
+                disabled={submitting || !deliveryOptions.length}
               >
                 {submitting ? 'PLACING ORDER…' : 'PLACE ORDER →'}
               </button>
-              {mode === 'production' && !user ? (
-                <p className="form-error tiny" style={{ textAlign: 'center', marginTop: 10 }}>
-                  <Link to="/login?next=/checkout" style={{ fontWeight: 700 }}>Sign in</Link> to place an order.
-                </p>
-              ) : null}
               <p className="muted tiny" style={{ lineHeight: 1.7, textAlign: 'center' }}>
                 By placing this order you agree to the <Link to="/policies/terms">Terms</Link> and <Link to="/policies/privacy">Privacy Policy</Link>.
               </p>

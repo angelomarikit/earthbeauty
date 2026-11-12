@@ -61,7 +61,7 @@ export function ProductCard({ product }: { product: Product }) {
             window.setTimeout(() => setMessage(null), 1600)
           }}
         >
-          <ShoppingBag size={14} /> {!canAdd ? 'UNAVAILABLE' : message ?? 'ADD TO CART'}
+          <ShoppingBag size={14} /> {!canAdd ? 'OUT OF STOCK' : message ?? 'ADD TO CART'}
         </button>
       </div>
       <Link to={`/product/${product.slug}`} className="pbody">

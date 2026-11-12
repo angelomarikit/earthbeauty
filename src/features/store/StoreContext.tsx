@@ -343,7 +343,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return `${product.name} has no valid variant. Add a variant in Admin → Products and save.`
           }
           const rpcVariantId = orderLineVariantId(product, line.variantId)
-          if (mode === 'production' && !rpcVariantId) {
+          if (mode === 'production' && !rpcVariantId && product.variants.length > 0) {
             return `${product.name} must use a saved variant UUID before checkout. Re-save the product in admin.`
           }
           const stock = variant?.stock ?? product.stock
@@ -408,6 +408,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               const storagePath = await uploadPaymentProof(input.proofFile, orderId)
               await productionSubmitPaymentProof({
                 orderId,
+                email: input.email,
                 storagePath,
                 referenceNumber: input.referenceNumber?.trim() ?? '',
                 fileName: input.proofFile.name,

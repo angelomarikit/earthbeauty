@@ -2,6 +2,9 @@ import { DATA_MODE } from '@/lib/mode'
 import { isUuid } from '@/lib/ids'
 import type { CartLine, Coupon, DemoState, Product, Variant } from '@/types'
 
+/** In-memory only when `product_variants` row is missing — checkout uses `variant_id: null` until admin/SQL backfill. */
+export const CATALOG_LEVEL_VARIANT_ID = '__catalog__'
+
 export function activeProducts(state: DemoState) {
   return state.products.filter((product) => product.active)
 }
@@ -26,6 +29,7 @@ export function defaultVariant(product: Product): Variant {
 /** Real DB variant id for cart/checkout, or null when not persistable. */
 export function cartVariantId(product: Product, variant: Variant | null): string | null {
   if (!variant) return null
+  if (variant.id === CATALOG_LEVEL_VARIANT_ID) return null
   if (!product.variants.some((entry) => entry.id === variant.id)) return null
   return isUuid(variant.id) ? variant.id : null
 }
@@ -55,6 +59,17 @@ export function findVariant(product: Product, variantId: string | null): Variant
   }
   const fromList = product.variants.find((variant) => variant.active) ?? product.variants[0]
   if (fromList) return fromList
+  if (DATA_MODE === 'production' && product.active) {
+    return {
+      id: CATALOG_LEVEL_VARIANT_ID,
+      label: 'Standard',
+      sku: product.sku,
+      priceCentavos: product.priceCentavos,
+      compareAtCentavos: product.compareAtCentavos,
+      stock: product.stock,
+      active: true,
+    }
+  }
   return DATA_MODE === 'demo' ? defaultVariant(product) : null
 }
 
@@ -68,7 +83,6 @@ export function comparePrice(product: Product, variant?: Variant | null) {
 
 export function availableStock(product: Product, variant?: Variant | null) {
   if (!product.active) return 0
-  if (!variant && DATA_MODE === 'production') return 0
   return variant?.stock ?? product.stock
 }
 

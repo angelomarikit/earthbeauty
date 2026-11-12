@@ -75,10 +75,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (!product) return 'Product not found.'
         const variant = findVariant(product, variantId)
         const persistVariantId = cartVariantId(product, variant)
-        if (DATA_MODE === 'production' && !persistVariantId) {
-          return 'This product is not ready for checkout. Ask the store to save a product variant.'
+        let cartVariant: string | null
+        if (DATA_MODE === 'production') {
+          if (product.variants.length === 0) {
+            if (product.stock < 1) return 'This product is out of stock.'
+            cartVariant = persistVariantId
+          } else if (!persistVariantId) {
+            return 'This product is not ready for checkout. Re-save it in Admin → Products.'
+          } else {
+            cartVariant = persistVariantId
+          }
+        } else {
+          cartVariant = variantId ?? variant?.id ?? null
         }
-        const cartVariant = DATA_MODE === 'production' ? persistVariantId : variantId ?? variant?.id ?? null
         const stock = stockFor(productId, cartVariant)
         const existing = lines.find((line) => same(line, productId, cartVariant))?.quantity ?? 0
         if (existing + quantity > stock) return 'That quantity is more than the available stock.'
