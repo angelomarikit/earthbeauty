@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { BrandLogo } from '@/components/branding/BrandLogo'
+import { FileUploadField } from '@/components/forms/FileUploadField'
 import { PackArt } from '@/components/product/ProductCard'
 import { cartDetailed, couponDiscount } from '@/features/catalog/pricing'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -283,11 +284,12 @@ export function CheckoutPage() {
                       <input className="field-input" {...form.register('referenceNumber')} placeholder="Reference or transaction number" />
                     </Field>
                     <Field label="Proof of payment *">
-                      <input
-                        className="field-input"
-                        type="file"
+                      <FileUploadField
                         accept="image/*,.pdf"
-                        onChange={(event) => setProofFile(event.target.files?.[0] ?? null)}
+                        buttonLabel="Upload receipt"
+                        fileName={proofFile?.name ?? null}
+                        hint="Image or PDF"
+                        onChange={(file) => setProofFile(file)}
                       />
                     </Field>
                   </div>

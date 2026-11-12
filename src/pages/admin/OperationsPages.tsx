@@ -62,7 +62,7 @@ export function OrdersAdminPage() {
                 <td>{formatPeso(order.totalCentavos)}</td>
                 <td><span className={paymentClass(order.paymentStatus)}>{paymentLabel(order.paymentStatus)}</span></td>
                 <td><span className={fulfillmentClass(order.fulfillmentStatus)}>{fulfillmentLabel(order.fulfillmentStatus)}</span></td>
-                <td><Link className="text-link" to={`/admin/orders/${order.id}`}>Open</Link></td>
+                <td><Link className="btn-action" to={`/admin/orders/${order.id}`}>Open</Link></td>
               </tr>
             ))}
           </tbody>
@@ -257,7 +257,7 @@ export function MarketingAdminPage() {
       <h1 style={{ font: '31px Georgia, serif' }}>Marketing</h1>
       <div className="grid2" style={{ marginTop: 16 }}>
         <div className="whitepanel">
-          <div className="between"><h3>Homepage banners</h3><button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => saveBanner(blankBanner(state.banners.length + 1))}>Add</button></div>
+          <div className="between"><h3>Homepage banners</h3><button type="button" className="btn outline compact" onClick={() => saveBanner(blankBanner(state.banners.length + 1))}>＋ Add banner</button></div>
           {state.banners.sort((a, b) => a.sortOrder - b.sortOrder).map((banner) => (
             <div key={banner.id} style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
               <input className="field-input" value={banner.title} onChange={(event) => saveBanner({ ...banner, title: event.target.value })} />
@@ -265,18 +265,18 @@ export function MarketingAdminPage() {
               <input className="field-input" style={{ marginTop: 8 }} value={banner.buttonLabel} onChange={(event) => saveBanner({ ...banner, buttonLabel: event.target.value })} />
               <input className="field-input" style={{ marginTop: 8 }} value={banner.href} onChange={(event) => saveBanner({ ...banner, href: event.target.value })} />
               <label className="checkline"><input type="checkbox" checked={banner.active} onChange={(event) => saveBanner({ ...banner, active: event.target.checked })} /> Active</label>
-              <button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => deleteBanner(banner.id)}>Remove</button>
+              <button type="button" className="btn-action danger" onClick={() => deleteBanner(banner.id)}>Remove</button>
             </div>
           ))}
         </div>
         <div>
           <div className="whitepanel">
-            <div className="between"><h3>Coupon codes</h3><button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => saveCoupon(blankCoupon())}>Add</button></div>
+            <div className="between"><h3>Coupon codes</h3><button type="button" className="btn outline compact" onClick={() => saveCoupon(blankCoupon())}>＋ Add coupon</button></div>
             {state.coupons.map((coupon) => (
               <div key={coupon.id} className="between" style={{ marginTop: 10 }}>
                 <input className="field-input" value={coupon.code} onChange={(event) => saveCoupon({ ...coupon, code: event.target.value.toUpperCase() })} />
                 <label className="checkline"><input type="checkbox" checked={coupon.active} onChange={(event) => saveCoupon({ ...coupon, active: event.target.checked })} /> Active</label>
-                <button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => deleteCoupon(coupon.id)}>Remove</button>
+                <button type="button" className="btn-action danger" onClick={() => deleteCoupon(coupon.id)}>Remove</button>
               </div>
             ))}
           </div>

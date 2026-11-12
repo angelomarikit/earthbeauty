@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { FileUploadField } from '@/components/forms/FileUploadField'
 import { PackArt } from '@/components/product/ProductCard'
 import { brandName, categoryName } from '@/features/catalog/pricing'
 import { useStore } from '@/features/store/StoreContext'
@@ -64,10 +65,12 @@ export function ProductsAdminPage() {
                   <td>{formatPeso(product.priceCentavos)}</td>
                   <td>{product.stock}</td>
                   <td><span className={product.active ? 'status' : 'status muted'}>{product.active ? 'Active' : 'Hidden'}</span></td>
-                  <td className="row">
-                    <Link to={`/admin/products/${product.id}`} className="text-link">Edit</Link>
-                    <button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => saveProduct({ ...product, active: !product.active })}>{product.active ? 'Hide' : 'Activate'}</button>
-                    <button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => setPendingDelete(product)}>Delete</button>
+                  <td>
+                    <div className="action-row">
+                      <Link to={`/admin/products/${product.id}`} className="btn-action">Edit</Link>
+                      <button type="button" className="btn-action ghost" onClick={() => saveProduct({ ...product, active: !product.active })}>{product.active ? 'Hide' : 'Activate'}</button>
+                      <button type="button" className="btn-action danger" onClick={() => setPendingDelete(product)}>Delete</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -184,13 +187,11 @@ export function ProductFormPage() {
           <div className="whitepanel">
             <div className="fieldlabel">Product image</div>
             <div className="pimg" style={{ borderRadius: 10 }}>{form.imageUrl ? <img src={form.imageUrl} alt="" /> : <PackArt type={form.pack} />}</div>
-            <input
-              className="field-input"
-              style={{ marginTop: 12 }}
-              type="file"
-              accept="image/*"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
+            <FileUploadField
+              buttonLabel="Upload product image"
+              fileName={pendingImage?.name ?? (form.imageUrl ? 'Image selected' : null)}
+              hint="JPG, PNG, or WebP · max 5 MB in production"
+              onChange={(file) => {
                 if (!file) return
                 if (mode === 'production') {
                   setPendingImage(file)
@@ -216,7 +217,7 @@ export function ProductFormPage() {
             </Field>
           </div>
           <div className="whitepanel" style={{ marginTop: 16 }}>
-            <div className="between"><b>Variations</b><button type="button" className="text-link" style={{ background: 'none', border: 0 }} onClick={() => update('variants', [...form.variants, blankVariant(form)])}>Add variation</button></div>
+            <div className="between"><b>Variations</b><button type="button" className="btn outline compact" onClick={() => update('variants', [...form.variants, blankVariant(form)])}>＋ Add variation</button></div>
             {form.variants.map((variant, index) => (
               <div key={variant.id} className="grid2" style={{ marginTop: 12 }}>
                 <input className="field-input" value={variant.label} aria-label="Variation name" onChange={(event) => updateVariant(setForm, index, { label: event.target.value })} />
@@ -329,10 +330,11 @@ export function BrandsAdminPage() {
                   <div className="thumb" style={{ width: 64, height: 64, borderRadius: '100%', marginBottom: 8, background: brand.tint }}>
                     {brand.logoUrl ? <img src={brand.logoUrl} alt="" style={{ objectFit: 'contain', padding: 6 }} /> : <span className="small muted" style={{ display: 'grid', placeItems: 'center', height: '100%' }}>{brand.name.trim().charAt(0) || '?'}</span>}
                   </div>
-                  <label className="btn outline" style={{ fontSize: 10, padding: '6px 10px', cursor: 'pointer', display: 'inline-block' }}>
-                    Upload
-                    <input type="file" accept="image/*" hidden onChange={(event) => {
-                      const file = event.target.files?.[0]
+                  <FileUploadField
+                    buttonLabel="Upload logo"
+                    fileName={brand.logoUrl ? 'Logo on file' : null}
+                    hint="No logo yet"
+                    onChange={(file) => {
                       if (!file) return
                       void (async () => {
                         try {
@@ -352,11 +354,10 @@ export function BrandsAdminPage() {
                           setMessage(reason instanceof Error ? reason.message : 'Upload failed.')
                         }
                       })()
-                      event.target.value = ''
-                    }} />
-                  </label>
+                    }}
+                  />
                   {brand.logoUrl ? (
-                    <button type="button" className="text-link small" style={{ display: 'block', marginTop: 6, background: 'none', border: 0 }} onClick={() => edit(brand, { logoUrl: null })}>
+                    <button type="button" className="btn-action danger" style={{ marginTop: 8 }} onClick={() => edit(brand, { logoUrl: null })}>
                       Remove logo
                     </button>
                   ) : null}
@@ -368,10 +369,12 @@ export function BrandsAdminPage() {
                 </td>
                 <td><input type="checkbox" checked={brand.showOnHomepage} onChange={(event) => edit(brand, { showOnHomepage: event.target.checked })} /></td>
                 <td><input type="checkbox" checked={brand.active} onChange={(event) => edit(brand, { active: event.target.checked })} /></td>
-                <td className="row">
-                  <button className="pill" onClick={() => moveBrand(brand.id, -1)}>Up</button>
-                  <button className="pill" onClick={() => moveBrand(brand.id, 1)}>Down</button>
-                  <button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => setMessage(deleteBrand(brand.id))}>Delete</button>
+                <td>
+                  <div className="action-row">
+                    <button type="button" className="pill" onClick={() => moveBrand(brand.id, -1)}>Up</button>
+                    <button type="button" className="pill" onClick={() => moveBrand(brand.id, 1)}>Down</button>
+                    <button type="button" className="btn-action danger" onClick={() => setMessage(deleteBrand(brand.id))}>Delete</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -432,32 +435,38 @@ export function CategoriesAdminPage() {
               <tr key={category.id}>
                 <td>
                   <input className="field-input" value={category.name} onChange={(event) => edit(category, { name: event.target.value, slug: slugify(event.target.value) })} />
-                  <input className="field-input" style={{ marginTop: 8 }} type="file" accept="image/*" onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    if (!file) return
-                    void (async () => {
-                      try {
-                        if (mode === 'production') {
-                          const url = await uploadCategoryImage(file, category.id)
-                          edit(category, { imageUrl: url })
-                        } else if (file.size <= 400_000) {
-                          const reader = new FileReader()
-                          reader.onload = () => edit(category, { imageUrl: String(reader.result) })
-                          reader.readAsDataURL(file)
+                  <FileUploadField
+                    buttonLabel="Upload category image"
+                    fileName={category.imageUrl ? 'Image on file' : null}
+                    hint="Optional category artwork"
+                    onChange={(file) => {
+                      if (!file) return
+                      void (async () => {
+                        try {
+                          if (mode === 'production') {
+                            const url = await uploadCategoryImage(file, category.id)
+                            edit(category, { imageUrl: url })
+                          } else if (file.size <= 400_000) {
+                            const reader = new FileReader()
+                            reader.onload = () => edit(category, { imageUrl: String(reader.result) })
+                            reader.readAsDataURL(file)
+                          }
+                        } catch (reason: unknown) {
+                          setMessage(reason instanceof Error ? reason.message : 'Upload failed.')
                         }
-                      } catch (reason: unknown) {
-                        setMessage(reason instanceof Error ? reason.message : 'Upload failed.')
-                      }
-                    })()
-                  }} />
+                      })()
+                    }}
+                  />
                 </td>
                 <td><input type="checkbox" checked={category.showOnHomepage} onChange={(event) => edit(category, { showOnHomepage: event.target.checked })} /></td>
                 <td><input type="checkbox" checked={category.showInNav} onChange={(event) => edit(category, { showInNav: event.target.checked })} /></td>
                 <td><input type="checkbox" checked={category.active} onChange={(event) => edit(category, { active: event.target.checked })} /></td>
-                <td className="row">
-                  <button className="pill" onClick={() => moveCategory(category.id, -1)}>Up</button>
-                  <button className="pill" onClick={() => moveCategory(category.id, 1)}>Down</button>
-                  <button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => setMessage(deleteCategory(category.id))}>Delete</button>
+                <td>
+                  <div className="action-row">
+                    <button type="button" className="pill" onClick={() => moveCategory(category.id, -1)}>Up</button>
+                    <button type="button" className="pill" onClick={() => moveCategory(category.id, 1)}>Down</button>
+                    <button type="button" className="btn-action danger" onClick={() => setMessage(deleteCategory(category.id))}>Delete</button>
+                  </div>
                 </td>
               </tr>
             ))}
