@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useMemo, useState } from 'react'
+import { useForm, type FieldErrors } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { BrandLogo } from '@/components/branding/BrandLogo'
@@ -99,6 +99,57 @@ export function CheckoutPage() {
   const methods = useMemo(() => state.shippingMethods.filter((entry) => entry.active), [state.shippingMethods])
   const needsProof = manualMethodsRequireProof(payment)
 
+  useEffect(() => {
+    const activeMethods = state.shippingMethods.filter((entry) => entry.active)
+    const currentShipping = form.getValues('shippingMethodId')
+    if (!activeMethods.some((entry) => entry.id === currentShipping) && activeMethods[0]) {
+      form.setValue('shippingMethodId', activeMethods[0].id, { shouldValidate: true })
+    }
+    const currentPayment = form.getValues('payment') as PaymentMethod
+    const paymentOk =
+      (currentPayment === 'cod' && state.settings.codEnabled) ||
+      (currentPayment === 'gcash_manual' && state.settings.gcashEnabled) ||
+      (currentPayment === 'maya_manual' && state.settings.mayaEnabled) ||
+      (currentPayment === 'qrph_manual' && state.settings.qrphEnabled) ||
+      (currentPayment === 'xendit' && state.settings.xenditEnabled)
+    if (!paymentOk) {
+      form.setValue('payment', defaultPayment, { shouldValidate: true })
+    }
+  }, [state.shippingMethods, state.settings, defaultPayment, form])
+
+  const onInvalid = (errors: FieldErrors<FormValues>) => {
+    const first =
+      errors.firstName?.message ??
+      errors.lastName?.message ??
+      errors.email?.message ??
+      errors.phone?.message ??
+      errors.street?.message ??
+      errors.region?.message ??
+      errors.province?.message ??
+      errors.city?.message ??
+      errors.barangay?.message ??
+      errors.postalCode?.message ??
+      errors.shippingMethodId?.message ??
+      errors.payment?.message
+    setFormError(first ?? 'Complete all required fields in Contact & Delivery Details and Payment.')
+    const idMap: Record<string, keyof FormValues> = {
+      firstName: 'firstName',
+      lastName: 'lastName',
+      email: 'email',
+      phone: 'phone',
+      street: 'street',
+      region: 'region',
+      province: 'province',
+      city: 'city',
+      barangay: 'barangay',
+      postalCode: 'postalCode',
+    }
+    const key = (Object.keys(errors) as (keyof FormValues)[]).find((k) => errors[k])
+    if (key && idMap[key]) {
+      form.setFocus(idMap[key])
+    }
+  }
+
   const onSubmit = form.handleSubmit(async (values) => {
     if (!detailed.length) {
       setFormError('Your cart is empty.')
@@ -108,8 +159,22 @@ export function CheckoutPage() {
       setFormError('Sign in to place an order.')
       return
     }
+    if (!methods.length) {
+      setFormError('No delivery methods are configured. Contact the store.')
+      return
+    }
+    if (needsProof && !proofFile) {
+      setFormError('Upload your payment receipt in the Payment section.')
+      return
+    }
+    if (needsProof && !values.referenceNumber?.trim()) {
+      setFormError('Enter the payment reference number in the Payment section.')
+      form.setFocus('referenceNumber')
+      return
+    }
     setSubmitting(true)
     setFormError(null)
+    try {
     const result = await placeOrder({
       customerId: user?.id ?? null,
       customerName: `${values.firstName} ${values.lastName}`.trim(),
@@ -137,15 +202,22 @@ export function CheckoutPage() {
       proofFile,
       referenceNumber: values.referenceNumber,
     })
-    setSubmitting(false)
     if (typeof result === 'string') {
-      setFormError(result)
+      const hint = /permission denied|place_order/i.test(result)
+        ? ' Run supabase/migrations/0007_checkout_rpc_grants.sql in the Supabase SQL Editor, then try again.'
+        : ''
+      setFormError(result + hint)
       return
     }
     clear()
     sessionStorage.removeItem('ebw-voucher')
     navigate(`/order-confirmation/${result.orderNumber}`)
-  })
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Could not place the order.')
+    } finally {
+      setSubmitting(false)
+    }
+  }, onInvalid)
 
   return (
     <div className="page">
@@ -233,6 +305,11 @@ export function CheckoutPage() {
                 </Field>
                 <div className="form-group">
                   <div className="fieldlabel">Delivery method</div>
+                  {!methods.length ? (
+                    <p className="form-error" style={{ marginTop: 8 }}>
+                      No delivery methods are available. Add one in Admin → Store Settings → Shipping methods.
+                    </p>
+                  ) : null}
                   {methods.map((entry) => (
                     <label key={entry.id} className={`pay-option ${shippingMethodId === entry.id ? 'on' : ''}`}>
                       <div className="pay-option__row">
@@ -359,10 +436,20 @@ export function CheckoutPage() {
               <div className="line" />
               <div className="between"><b>Order Total</b><b className="price" style={{ fontSize: 24 }}>{formatPeso(total)}</b></div>
               <p className="muted tiny">Totals use catalog prices, delivery, and any voucher applied at checkout.</p>
-              {formError ? <p className="form-error">{formError}</p> : null}
-              <button className="btn wide" style={{ marginTop: 25 }} type="submit" disabled={submitting || (mode === 'production' && !user)}>
+              {formError ? <p className="form-error" role="alert">{formError}</p> : null}
+              <button
+                className="btn wide"
+                style={{ marginTop: 25 }}
+                type="submit"
+                disabled={submitting || !methods.length || (mode === 'production' && !user)}
+              >
                 {submitting ? 'PLACING ORDER…' : 'PLACE ORDER →'}
               </button>
+              {mode === 'production' && !user ? (
+                <p className="form-error tiny" style={{ textAlign: 'center', marginTop: 10 }}>
+                  <Link to="/login?next=/checkout" style={{ fontWeight: 700 }}>Sign in</Link> to place an order.
+                </p>
+              ) : null}
               <p className="muted tiny" style={{ lineHeight: 1.7, textAlign: 'center' }}>
                 By placing this order you agree to the <Link to="/policies/terms">Terms</Link> and <Link to="/policies/privacy">Privacy Policy</Link>.
               </p>
