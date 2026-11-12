@@ -23,6 +23,13 @@ export function formatShortDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
 }
 
+export function formatDateTime(iso: string) {
+  const date = new Date(iso)
+  const day = date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return `${day} · ${time}`
+}
+
 export function slugify(value: string) {
   return value
     .toLowerCase()

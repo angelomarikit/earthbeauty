@@ -1312,6 +1312,92 @@ textarea.field-input { min-height: 110px; resize: vertical; }
 .reports-legend__item i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; font-style: normal; }
 .reports-inventory { padding: 24px 26px; }
 .reports-status-panel { padding-bottom: 22px; }
+.order-history { margin-top: 6px; }
+.order-timeline {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+}
+.order-timeline__item {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 6px 14px;
+  position: relative;
+  padding-bottom: 22px;
+}
+.order-timeline__item:last-child { padding-bottom: 0; }
+.order-timeline__item:not(:last-child) .order-timeline__rail::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  bottom: -22px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #e8d8dd 0%, #f4ecef 100%);
+}
+.order-timeline__item.latest .order-timeline__body {
+  background: linear-gradient(145deg, #fff 0%, #fff8fb 100%);
+  border-color: #ffd8ea;
+}
+.order-timeline__rail {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  padding-top: 6px;
+}
+.order-timeline__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #f0e4e8;
+  z-index: 1;
+}
+.order-timeline__icon {
+  margin-top: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #faf5f7;
+  color: var(--primary);
+  border: 1px solid #f0e7ea;
+}
+.order-timeline__body {
+  border: 1px solid #f0e7ea;
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  background: #fdfcfd;
+}
+.order-timeline__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 10px;
+}
+.order-timeline__time {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.order-timeline__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.order-timeline__badges .status { font-size: 10px; padding: 6px 10px; }
+.order-timeline__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #6b5c61;
+}
 .pager { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 30px; flex-wrap: wrap; }
 .mobile-tools { display: none; }
 .empty {

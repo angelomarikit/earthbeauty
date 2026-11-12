@@ -1,4 +1,5 @@
 import { AdminAlertModal, AdminConfirmModal } from '@/components/admin/AdminModal'
+import { OrderStatusHistory } from '@/components/admin/OrderStatusHistory'
 import { PaymentSettingsCards } from '@/components/admin/PaymentSettingsCards'
 import { PolicySettingsEditor } from '@/components/admin/PolicySettingsEditor'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -203,10 +204,7 @@ export function OrderAdminDetailPage() {
           <textarea className="field-input" value={notes} onChange={(event) => setNotes(event.target.value)} />
           <button className="btn" style={{ marginTop: 14 }} onClick={() => updateOrder(order.id, { trackingNumber: tracking, notes, historyNote: 'Tracking or notes updated.' })}>SAVE FULFILLMENT</button>
           <div className="line" />
-          <h3>Status history</h3>
-          {order.history.map((event, index) => (
-            <p key={`${event.at}-${index}`} className="small muted">{formatDate(event.at)} · {fulfillmentLabel(event.fulfillment)} · {paymentLabel(event.payment)} · {event.note}</p>
-          ))}
+          <OrderStatusHistory order={order} />
         </div>
       </div>
     </>
