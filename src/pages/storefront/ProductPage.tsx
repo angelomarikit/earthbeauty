@@ -6,8 +6,6 @@ import { availableStock, brandName, cartVariantId, comparePrice, findProduct, fi
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { usePageMeta } from '@/lib/seo'
-import type { PackStyle } from '@/types'
-
 export function ProductPage() {
   const { slug } = useParams()
   const { state, mode } = useStore()
@@ -15,7 +13,6 @@ export function ProductPage() {
   const navigate = useNavigate()
   const product = slug ? findProduct(state, slug) : undefined
   const sellable = product?.active ?? false
-  const [pack, setPack] = useState<PackStyle | null>(null)
   const [variantId, setVariantId] = useState<string | null>(null)
   const [qty, setQty] = useState(1)
   const [tab, setTab] = useState<'description' | 'use' | 'shipping'>('description')
@@ -51,7 +48,6 @@ export function ProductPage() {
     )
   }
 
-  const shownPack = pack ?? product.pack
   const savePercent = variant.compareAtCentavos && variant.compareAtCentavos > unitPrice(product, variant)
     ? Math.round((1 - unitPrice(product, variant) / variant.compareAtCentavos) * 100)
     : 0
@@ -72,17 +68,8 @@ export function ProductPage() {
         <div className="detail-grid">
           <div>
             <div className={`pimg gallery-main ${product.imageUrl ? 'photo' : ''}`}>
-              {product.imageUrl && !pack ? <img src={product.imageUrl} alt={product.name} /> : <PackArt type={shownPack} />}
+              {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <PackArt type={product.pack} />}
               {product.badge ? <span className="flag">{product.badge === 'BEST' ? 'BEST SELLER' : product.badge}</span> : null}
-            </div>
-            <div className="thumbs">
-              {(product.imageUrl ? [product.pack, ...product.gallery] : product.gallery).slice(0, 4).map((item) => (
-                <button key={item} className={shownPack === item ? 'on' : undefined} onClick={() => setPack(item)} aria-label={`Show ${item} view`}>
-                  <div className="pimg">
-                    <PackArt type={item} />
-                  </div>
-                </button>
-              ))}
             </div>
           </div>
           <div>
