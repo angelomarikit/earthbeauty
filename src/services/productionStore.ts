@@ -72,6 +72,32 @@ function mapProduct(row: Row): Product {
   }
 }
 
+function mapPolicies(row: Row, base: StoreSettings['policies']): StoreSettings['policies'] {
+  const raw = row.policies
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base
+  const policies = raw as Record<string, unknown>
+  return {
+    shipping: asText(policies.shipping, base.shipping),
+    returns: asText(policies.returns, base.returns),
+    privacy: asText(policies.privacy, base.privacy),
+    terms: asText(policies.terms, base.terms),
+  }
+}
+
+function storeSettingsSaveError(message: string): Error {
+  if (/show_preview_catalogue_notice/i.test(message)) {
+    return new Error(
+      `${message} Run supabase/migrations/0003_preview_catalogue_notice.sql in the Supabase SQL Editor, then save again.`,
+    )
+  }
+  if (/column of 'store_settings'/i.test(message)) {
+    return new Error(
+      `${message} Run pending files in supabase/migrations/ (0002_manual_payments.sql, 0003_preview_catalogue_notice.sql, 0004_xendit_gateway_flags.sql) in the Supabase SQL Editor.`,
+    )
+  }
+  return new Error(message)
+}
+
 function mapSettingsRow(row: Row, base: StoreSettings): StoreSettings {
   return {
     ...base,
@@ -81,7 +107,12 @@ function mapSettingsRow(row: Row, base: StoreSettings): StoreSettings {
     phone: asText(row.phone, base.phone),
     email: asText(row.email, base.email),
     announcement: asText(row.announcement, base.announcement),
+    about: asText(row.about, base.about),
+    instagram: asText(row.instagram, base.instagram),
+    facebook: asText(row.facebook, base.facebook),
+    tiktok: asText(row.tiktok, base.tiktok),
     lowStockThreshold: asNumber(row.low_stock_threshold, base.lowStockThreshold),
+    policies: mapPolicies(row, base.policies),
     showPreviewCatalogueNotice:
       row.show_preview_catalogue_notice == null
         ? base.showPreviewCatalogueNotice
@@ -394,7 +425,12 @@ export async function productionSave(kind: string, payload: unknown) {
       phone: settings.phone,
       email: settings.email,
       announcement: settings.announcement,
+      about: settings.about,
+      instagram: settings.instagram,
+      facebook: settings.facebook,
+      tiktok: settings.tiktok,
       low_stock_threshold: settings.lowStockThreshold,
+      policies: settings.policies,
       show_preview_catalogue_notice: settings.showPreviewCatalogueNotice,
       cod_enabled: settings.codEnabled,
       gcash_enabled: settings.gcashEnabled,
@@ -411,7 +447,7 @@ export async function productionSave(kind: string, payload: unknown) {
       qrph_instructions: settings.qrphInstructions,
       xendit_enabled: settings.xenditEnabled,
     })
-    if (error) throw new Error(error.message)
+    if (error) throw storeSettingsSaveError(error.message)
     return
   }
 
