@@ -1,4 +1,5 @@
 import { AdminConfirmModal } from '@/components/admin/AdminModal'
+import { PaymentSettingsCards } from '@/components/admin/PaymentSettingsCards'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, XAxis } from 'recharts'
@@ -437,26 +438,21 @@ export function SettingsAdminPage() {
             </p>
           </div>
           <div className="whitepanel">
-            <h3>Social and payments</h3>
-            <Field label="Instagram"><input className="field-input" value={form.instagram} onChange={(event) => set('instagram', event.target.value)} /></Field>
-            <Field label="Facebook"><input className="field-input" value={form.facebook} onChange={(event) => set('facebook', event.target.value)} /></Field>
-            <Field label="TikTok"><input className="field-input" value={form.tiktok} onChange={(event) => set('tiktok', event.target.value)} /></Field>
-            <Field label="GCash name"><input className="field-input" value={form.gcashAccountName} onChange={(event) => set('gcashAccountName', event.target.value)} /></Field>
-            <Field label="GCash number"><input className="field-input" value={form.gcashNumber} onChange={(event) => set('gcashNumber', event.target.value)} /></Field>
-            <Field label="GCash instructions"><textarea className="field-input" value={form.gcashInstructions} onChange={(event) => set('gcashInstructions', event.target.value)} /></Field>
-            <label className="checkline"><input type="checkbox" checked={form.codEnabled} onChange={(event) => set('codEnabled', event.target.checked)} /> Cash on delivery available</label>
-            <label className="checkline"><input type="checkbox" checked={form.gcashEnabled} onChange={(event) => set('gcashEnabled', event.target.checked)} /> GCash instructions available</label>
-            <label className="checkline"><input type="checkbox" checked={form.mayaEnabled} onChange={(event) => set('mayaEnabled', event.target.checked)} /> Maya manual payments</label>
-            <Field label="Maya account name"><input className="field-input" value={form.mayaAccountName} onChange={(event) => set('mayaAccountName', event.target.value)} /></Field>
-            <Field label="Maya number"><input className="field-input" value={form.mayaNumber} onChange={(event) => set('mayaNumber', event.target.value)} /></Field>
-            <Field label="Maya instructions"><textarea className="field-input" value={form.mayaInstructions} onChange={(event) => set('mayaInstructions', event.target.value)} /></Field>
-            <label className="checkline"><input type="checkbox" checked={form.qrphEnabled} onChange={(event) => set('qrphEnabled', event.target.checked)} /> QR Ph manual payments</label>
-            <Field label="QR Ph label"><input className="field-input" value={form.qrphDisplayName} onChange={(event) => set('qrphDisplayName', event.target.value)} /></Field>
-            <Field label="QR Ph recipient info"><textarea className="field-input" value={form.qrphRecipientInfo} onChange={(event) => set('qrphRecipientInfo', event.target.value)} /></Field>
-            <Field label="QR Ph instructions"><textarea className="field-input" value={form.qrphInstructions} onChange={(event) => set('qrphInstructions', event.target.value)} /></Field>
-            <label className="checkline"><input type="checkbox" checked={form.xenditEnabled} onChange={(event) => set('xenditEnabled', event.target.checked)} /> Xendit online checkout (requires Edge Function secrets)</label>
+            <h3>Social links</h3>
+            <Field label="Instagram"><input className="field-input" value={form.instagram} onChange={(event) => set('instagram', event.target.value)} placeholder="https://instagram.com/…" /></Field>
+            <Field label="Facebook"><input className="field-input" value={form.facebook} onChange={(event) => set('facebook', event.target.value)} placeholder="https://facebook.com/…" /></Field>
+            <Field label="TikTok"><input className="field-input" value={form.tiktok} onChange={(event) => set('tiktok', event.target.value)} placeholder="https://tiktok.com/@…" /></Field>
             <Field label="Low stock threshold"><input className="field-input" type="number" min={0} value={form.lowStockThreshold} onChange={(event) => set('lowStockThreshold', Number(event.target.value))} /></Field>
           </div>
+        </div>
+        <div className="whitepanel" style={{ marginTop: 16 }}>
+          <div className="between" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Payment methods</h3>
+              <div className="eyebrow" style={{ marginTop: 6 }}>CHECKOUT</div>
+            </div>
+          </div>
+          <PaymentSettingsCards form={form} set={set} />
         </div>
         <div className="whitepanel" style={{ marginTop: 16 }}>
           <h3>Draft policies</h3>

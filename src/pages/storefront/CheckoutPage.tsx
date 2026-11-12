@@ -252,14 +252,20 @@ export function CheckoutPage() {
                     <label className={`pay-option ${payment === 'gcash_manual' ? 'on' : ''}`}>
                       <div className="pay-option__row">
                         <input type="radio" value="gcash_manual" {...form.register('payment')} />
-                        <b>GCash</b>
+                        <div className="pay-option__brand">
+                          <img className="pay-method-logo" src="/assets/payments/gcash.svg" alt="GCash" width={112} height={38} />
+                        </div>
                       </div>
-                      <p className="muted small">
-                        {state.settings.gcashInstructions ||
-                          (state.settings.gcashNumber
-                            ? `Send to ${state.settings.gcashNumber}${state.settings.gcashAccountName ? ` (${state.settings.gcashAccountName})` : ''}. Upload your receipt after payment.`
-                            : 'Add your GCash number in Admin → Store Settings.')}
-                      </p>
+                      {state.settings.gcashInstructions ? (
+                        <p className="muted small">{state.settings.gcashInstructions}</p>
+                      ) : state.settings.gcashNumber ? (
+                        <p className="muted small">
+                          Send to <b>{state.settings.gcashNumber}</b>
+                          {state.settings.gcashAccountName ? ` · ${state.settings.gcashAccountName}` : null}. Then upload your receipt below.
+                        </p>
+                      ) : (
+                        <p className="muted small">Pay in the GCash app, then upload your receipt below.</p>
+                      )}
                     </label>
                   ) : null}
                   {state.settings.mayaEnabled ? (
@@ -298,9 +304,11 @@ export function CheckoutPage() {
                     <label className={`pay-option ${payment === 'xendit' ? 'on' : ''}`}>
                       <div className="pay-option__row">
                         <input type="radio" value="xendit" {...form.register('payment')} />
-                        <b>Pay online (Xendit)</b>
+                        <div className="pay-option__brand">
+                          <img className="pay-method-logo" src="/assets/payments/xendit.svg" alt="Xendit" width={112} height={38} />
+                        </div>
                       </div>
-                      <p className="muted small">You will be redirected to a secure payment page after placing the order.</p>
+                      <p className="muted small">Card, e-wallet, and other options on a secure Xendit page after you place the order.</p>
                     </label>
                   ) : null}
                 </div>

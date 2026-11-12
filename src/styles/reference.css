@@ -919,6 +919,20 @@ textarea.field-input { min-height: 110px; resize: vertical; }
   margin-top: 2px;
   flex-shrink: 0;
 }
+.pay-method-logo {
+  height: 32px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  display: block;
+}
+.pay-option__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
 .pay-option p {
   margin: 0;
   padding-left: 26px;
@@ -929,6 +943,67 @@ textarea.field-input { min-height: 110px; resize: vertical; }
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid var(--border);
+}
+.payment-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+.payment-setting-card {
+  border: 1px solid #e6dde1;
+  border-radius: 12px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fdfafb 100%);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.payment-setting-card.on {
+  border-color: var(--primary);
+  box-shadow: 0 8px 28px rgba(242, 10, 135, 0.1);
+}
+.payment-setting-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.payment-setting-card__body {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed #ecdfe4;
+}
+.payment-setting-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a8d93;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.payment-setting-card.on .payment-setting-toggle { color: var(--primary); }
+.payment-setting-live {
+  margin: 0 0 4px;
+  color: var(--primary);
+  font-weight: 700;
+}
+.payment-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #292329;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(48, 41, 46, 0.35); z-index: 55; }
 .admin-modal {
