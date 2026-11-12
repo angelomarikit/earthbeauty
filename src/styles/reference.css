@@ -892,16 +892,44 @@ textarea.field-input { min-height: 110px; resize: vertical; }
   background: white;
   border: 2px solid var(--primary);
 }
+.payment-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .pay-option {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   border: 1px solid var(--border);
   padding: 17px;
   border-radius: 7px;
   background: white;
   text-align: left;
   width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.pay-option__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.pay-option__row input[type='radio'] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.pay-option p {
+  margin: 0;
+  padding-left: 26px;
+  line-height: 1.55;
 }
 .pay-option.on { border-color: var(--primary); background: #fef8fa; }
-.pay-option + .pay-option { margin-top: 12px; }
+.payment-proof-panel {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(48, 41, 46, 0.35); z-index: 55; }
 .admin-modal {
   position: fixed;

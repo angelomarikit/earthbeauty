@@ -13,7 +13,7 @@ import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { regions } from '@/data/demo/locations'
 import { formatPeso } from '@/lib/format'
-import { manualMethodsRequireProof, paymentMethodLabel } from '@/lib/paymentMethods'
+import { manualMethodsRequireProof } from '@/lib/paymentMethods'
 import type { PaymentMethod } from '@/types'
 import { usePageMeta } from '@/lib/seo'
 
@@ -235,50 +235,83 @@ export function CheckoutPage() {
                   <div className="fieldlabel">Delivery method</div>
                   {methods.map((entry) => (
                     <label key={entry.id} className={`pay-option ${shippingMethodId === entry.id ? 'on' : ''}`}>
-                      <input type="radio" value={entry.id} {...form.register('shippingMethodId')} /> <b>{entry.name}</b>
-                      <span className="muted small"> · {entry.feeCentavos === 0 ? 'No fee' : formatPeso(entry.feeCentavos)}</span>
-                      <p className="muted small">{entry.detail}</p>
+                      <div className="pay-option__row">
+                        <input type="radio" value={entry.id} {...form.register('shippingMethodId')} />
+                        <b>{entry.name}</b>
+                        <span className="muted small"> · {entry.feeCentavos === 0 ? 'No fee' : formatPeso(entry.feeCentavos)}</span>
+                      </div>
+                      {entry.detail ? <p className="muted small">{entry.detail}</p> : null}
                     </label>
                   ))}
                 </div>
               </div>
               <div className="whitepanel" style={{ marginTop: 20 }}>
                 <h2 style={{ font: '24px Georgia, serif', margin: '0 0 22px' }}>Payment Method</h2>
-                {state.settings.gcashEnabled ? (
-                  <label className={`pay-option ${payment === 'gcash_manual' ? 'on' : ''}`}>
-                    <input type="radio" value="gcash_manual" {...form.register('payment')} /> <b>{paymentMethodLabel('gcash_manual')}</b>
-                    <p className="muted small">{state.settings.gcashInstructions}</p>
-                  </label>
-                ) : null}
-                {state.settings.mayaEnabled ? (
-                  <label className={`pay-option ${payment === 'maya_manual' ? 'on' : ''}`} style={{ marginTop: 12 }}>
-                    <input type="radio" value="maya_manual" {...form.register('payment')} /> <b>{paymentMethodLabel('maya_manual')}</b>
-                    <p className="muted small">{state.settings.mayaInstructions || `Send payment to ${state.settings.mayaNumber} (${state.settings.mayaAccountName}).`}</p>
-                  </label>
-                ) : null}
-                {state.settings.qrphEnabled ? (
-                  <label className={`pay-option ${payment === 'qrph_manual' ? 'on' : ''}`} style={{ marginTop: 12 }}>
-                    <input type="radio" value="qrph_manual" {...form.register('payment')} /> <b>{state.settings.qrphDisplayName || paymentMethodLabel('qrph_manual')}</b>
-                    <p className="muted small">{state.settings.qrphInstructions || state.settings.qrphRecipientInfo}</p>
-                  </label>
-                ) : null}
-                {state.settings.codEnabled ? (
-                  <label className={`pay-option ${payment === 'cod' ? 'on' : ''}`} style={{ marginTop: 12 }}>
-                    <input type="radio" value="cod" {...form.register('payment')} /> <b>Cash on Delivery</b>
-                    <p className="muted small">Pay when your order arrives.</p>
-                  </label>
-                ) : null}
-                {state.settings.xenditEnabled ? (
-                  <label className={`pay-option ${payment === 'xendit' ? 'on' : ''}`} style={{ marginTop: 12 }}>
-                    <input type="radio" value="xendit" {...form.register('payment')} /> <b>Pay online (Xendit)</b>
-                    <p className="muted small">You will be redirected to a secure payment page after placing the order.</p>
-                  </label>
-                ) : null}
+                <div className="payment-methods">
+                  {state.settings.gcashEnabled ? (
+                    <label className={`pay-option ${payment === 'gcash_manual' ? 'on' : ''}`}>
+                      <div className="pay-option__row">
+                        <input type="radio" value="gcash_manual" {...form.register('payment')} />
+                        <b>GCash</b>
+                      </div>
+                      <p className="muted small">
+                        {state.settings.gcashInstructions ||
+                          (state.settings.gcashNumber
+                            ? `Send to ${state.settings.gcashNumber}${state.settings.gcashAccountName ? ` (${state.settings.gcashAccountName})` : ''}. Upload your receipt after payment.`
+                            : 'Add your GCash number in Admin → Store Settings.')}
+                      </p>
+                    </label>
+                  ) : null}
+                  {state.settings.mayaEnabled ? (
+                    <label className={`pay-option ${payment === 'maya_manual' ? 'on' : ''}`}>
+                      <div className="pay-option__row">
+                        <input type="radio" value="maya_manual" {...form.register('payment')} />
+                        <b>Maya</b>
+                      </div>
+                      <p className="muted small">
+                        {state.settings.mayaInstructions ||
+                          (state.settings.mayaNumber
+                            ? `Send to ${state.settings.mayaNumber}${state.settings.mayaAccountName ? ` (${state.settings.mayaAccountName})` : ''}.`
+                            : 'Add Maya details in Admin → Store Settings.')}
+                      </p>
+                    </label>
+                  ) : null}
+                  {state.settings.qrphEnabled ? (
+                    <label className={`pay-option ${payment === 'qrph_manual' ? 'on' : ''}`}>
+                      <div className="pay-option__row">
+                        <input type="radio" value="qrph_manual" {...form.register('payment')} />
+                        <b>{state.settings.qrphDisplayName || 'QR Ph'}</b>
+                      </div>
+                      <p className="muted small">{state.settings.qrphInstructions || state.settings.qrphRecipientInfo || 'Scan and pay using QR Ph, then upload proof.'}</p>
+                    </label>
+                  ) : null}
+                  {state.settings.codEnabled ? (
+                    <label className={`pay-option ${payment === 'cod' ? 'on' : ''}`}>
+                      <div className="pay-option__row">
+                        <input type="radio" value="cod" {...form.register('payment')} />
+                        <b>Cash on Delivery</b>
+                      </div>
+                      <p className="muted small">Pay when your order arrives.</p>
+                    </label>
+                  ) : null}
+                  {state.settings.xenditEnabled ? (
+                    <label className={`pay-option ${payment === 'xendit' ? 'on' : ''}`}>
+                      <div className="pay-option__row">
+                        <input type="radio" value="xendit" {...form.register('payment')} />
+                        <b>Pay online (Xendit)</b>
+                      </div>
+                      <p className="muted small">You will be redirected to a secure payment page after placing the order.</p>
+                    </label>
+                  ) : null}
+                </div>
                 {needsProof ? (
-                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-                    <p className="small" style={{ marginBottom: 8 }}>
-                      Send <b>{formatPeso(total)}</b> using {paymentMethodLabel(payment)}, then upload your receipt.
-                      {payment === 'gcash_manual' ? ` GCash: ${state.settings.gcashNumber} (${state.settings.gcashAccountName}).` : null}
+                  <div className="payment-proof-panel">
+                    <p className="small" style={{ marginBottom: 12, lineHeight: 1.6 }}>
+                      Send <b>{formatPeso(total)}</b> via {payment === 'gcash_manual' ? 'GCash' : payment === 'maya_manual' ? 'Maya' : 'QR Ph'}, then upload your receipt below.
+                      {payment === 'gcash_manual' && state.settings.gcashNumber ? (
+                        <> GCash: <b>{state.settings.gcashNumber}</b>
+                          {state.settings.gcashAccountName ? ` (${state.settings.gcashAccountName})` : null}.</>
+                      ) : null}
                     </p>
                     <Field label="Payment reference number *">
                       <input className="field-input" {...form.register('referenceNumber')} placeholder="Reference or transaction number" />
