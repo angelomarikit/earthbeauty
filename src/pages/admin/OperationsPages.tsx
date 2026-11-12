@@ -10,7 +10,6 @@ import { useStore } from '@/features/store/StoreContext'
 import { productionFetchOrderProofs, productionMarkCodCollected, productionVerifyPayment } from '@/services/productionStore'
 import { signedProofUrl } from '@/services/storageUpload'
 import { formatDate, formatPeso, fulfillmentClass, fulfillmentLabel, paymentClass, paymentLabel, uid } from '@/lib/format'
-import { paymentMethodLabel } from '@/lib/paymentMethods'
 import type { Banner, Coupon, FulfillmentStatus, PaymentProof, PaymentStatus, StoreSettings } from '@/types'
 
 const fulfillmentOptions: FulfillmentStatus[] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
