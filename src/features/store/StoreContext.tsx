@@ -3,7 +3,7 @@ import { buildSeed, SEED_KEY, SEED_VERSION } from '@/data/demo/seed'
 import { DATA_MODE } from '@/lib/mode'
 import { uid } from '@/lib/format'
 import { couponDiscount, findVariant, unitPrice } from '@/features/catalog/pricing'
-import type { Address, Banner, Category, Coupon, DemoState, DemoUser, Order, PaymentMethod, Product, ShippingMethod, StoreSettings } from '@/types'
+import type { Address, Banner, Brand, Category, Coupon, DemoState, DemoUser, Order, PaymentMethod, Product, ShippingMethod, StoreSettings } from '@/types'
 
 export type PlaceOrderInput = {
   customerId: string | null
@@ -31,6 +31,9 @@ type StoreValue = {
   saveCategory: (category: Category) => string | null
   deleteCategory: (id: string) => string | null
   moveCategory: (id: string, direction: -1 | 1) => void
+  saveBrand: (brand: Brand) => string | null
+  deleteBrand: (id: string) => string | null
+  moveBrand: (id: string, direction: -1 | 1) => void
   adjustStock: (productId: string, variantId: string | null, delta: number, reason: string) => string | null
   updateOrder: (orderId: string, patch: Partial<Order> & { historyNote?: string }) => void
   placeOrder: (input: PlaceOrderInput) => Order | string
@@ -53,10 +56,17 @@ function loadDemo(): DemoState {
     if (!raw) return buildSeed()
     const parsed = JSON.parse(raw) as DemoState
     if (parsed.seedVersion !== SEED_VERSION || !parsed.products?.length) return buildSeed()
+    const seed = buildSeed()
+    const seedProducts = new Map(seed.products.map((product) => [product.id, product]))
     return {
       ...parsed,
+      brands: parsed.brands?.length ? parsed.brands : seed.brands,
+      products: parsed.products.map((product) => ({
+        ...product,
+        brandId: product.brandId ?? seedProducts.get(product.id)?.brandId ?? null,
+      })),
       settings: {
-        ...buildSeed().settings,
+        ...seed.settings,
         ...parsed.settings,
         showPreviewCatalogueNotice: parsed.settings.showPreviewCatalogueNotice ?? true,
       },
@@ -72,6 +82,7 @@ function emptyProduction(): DemoState {
     ...seed,
     products: [],
     categories: [],
+    brands: [],
     orders: [],
     users: seed.users.filter((user) => user.role === 'admin'),
     banners: [],
@@ -187,6 +198,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return {
             ...current,
             categories: ordered.map((entry, order) => ({ ...entry, sortOrder: order + 1 })),
+          }
+        })
+      },
+      saveBrand: (brand) => {
+        const duplicate = state.brands.some((entry) => entry.slug === brand.slug && entry.id !== brand.id)
+        if (duplicate) return 'Another brand already uses that link.'
+        setState((current) => {
+          const exists = current.brands.some((entry) => entry.id === brand.id)
+          const brands = exists
+            ? current.brands.map((entry) => (entry.id === brand.id ? brand : entry))
+            : [...current.brands, brand]
+          return audit({ ...current, brands }, exists ? 'update-brand' : 'create-brand', brand.name)
+        })
+        if (mode === 'production') void productionSave('brand', brand)
+        return null
+      },
+      deleteBrand: (id) => {
+        const used = state.products.some((product) => product.brandId === id)
+        if (used) return 'Move or delete the products for this brand before deleting it.'
+        setState((current) =>
+          audit(
+            { ...current, brands: current.brands.filter((entry) => entry.id !== id) },
+            'delete-brand',
+            id,
+          ),
+        )
+        if (mode === 'production') void productionSave('delete-brand', { id })
+        return null
+      },
+      moveBrand: (id, direction) => {
+        setState((current) => {
+          const ordered = [...current.brands].sort((a, b) => a.sortOrder - b.sortOrder)
+          const index = ordered.findIndex((entry) => entry.id === id)
+          const target = index + direction
+          if (index < 0 || target < 0 || target >= ordered.length) return current
+          const swap = ordered[index]
+          ordered[index] = ordered[target]
+          ordered[target] = swap
+          return {
+            ...current,
+            brands: ordered.map((entry, order) => ({ ...entry, sortOrder: order + 1 })),
           }
         })
       },

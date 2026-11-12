@@ -38,6 +38,11 @@ export function categoryName(state: DemoState, categoryId: string) {
   return state.categories.find((category) => category.id === categoryId)?.name ?? 'Unassigned'
 }
 
+export function brandName(state: DemoState, brandId: string | null, fallback: string) {
+  if (!brandId) return fallback
+  return state.brands.find((brand) => brand.id === brandId)?.name ?? fallback
+}
+
 export function cartDetailed(state: DemoState, lines: CartLine[]) {
   return lines
     .map((line) => {

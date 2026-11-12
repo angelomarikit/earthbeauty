@@ -9,11 +9,12 @@ import type { Product } from '@/types'
 
 const PAGE_SIZE = 6
 
-function titleFor(categoryName: string, collection: string, query: string) {
+function titleFor(brandNameLabel: string, categoryName: string, collection: string, query: string) {
   if (query) return `Search results`
   if (collection === 'best-sellers') return 'Best Sellers'
   if (collection === 'sale') return 'Sale'
   if (collection === 'new') return 'New Arrivals'
+  if (brandNameLabel) return brandNameLabel
   if (categoryName) return categoryName
   return 'Shop All Products'
 }
@@ -24,6 +25,7 @@ export function ShopPage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const q = (params.get('q') ?? '').trim().toLowerCase()
   const categorySlug = params.get('category') ?? ''
+  const brandSlug = params.get('brand') ?? ''
   const collection = params.get('collection') ?? ''
   const sort = params.get('sort') ?? 'featured'
   const max = Number(params.get('max') ?? 2000)
@@ -31,8 +33,9 @@ export function ShopPage() {
   const onSale = params.get('sale') === '1'
   const page = Math.max(1, Number(params.get('page') ?? 1))
   const category = state.categories.find((entry) => entry.slug === categorySlug)
+  const brand = state.brands.find((entry) => entry.slug === brandSlug)
 
-  usePageMeta(`${titleFor(category?.name ?? '', collection, q)} · Earth Beauty & Wellness`, 'Browse the demonstration beauty and wellness catalogue.')
+  usePageMeta(`${titleFor(brand?.name ?? '', category?.name ?? '', collection, q)} · Earth Beauty & Wellness`, 'Browse the demonstration beauty and wellness catalogue.')
 
   function update(next: Record<string, string | null>) {
     const merged = new URLSearchParams(params)
@@ -48,6 +51,7 @@ export function ShopPage() {
     let items = state.products.filter((product) => product.active)
     if (q) items = items.filter((product) => `${product.name} ${product.sku}`.toLowerCase().includes(q))
     if (category) items = items.filter((product) => product.categoryId === category.id)
+    if (brand) items = items.filter((product) => product.brandId === brand.id)
     if (collection === 'best-sellers') items = items.filter((product) => product.bestSeller)
     if (collection === 'sale') items = items.filter((product) => isOnSale(product))
     if (collection === 'new') items = items.filter((product) => product.isNew)
@@ -57,14 +61,14 @@ export function ShopPage() {
     const sorted = [...items]
     sorted.sort((a, b) => compareProducts(a, b, sort))
     return sorted
-  }, [category, collection, inStock, max, onSale, q, sort, state.products])
+  }, [brand, category, collection, inStock, max, onSale, q, sort, state.products])
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, pages)
   const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
   const from = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
   const to = Math.min(safePage * PAGE_SIZE, filtered.length)
-  const heading = titleFor(category?.name ?? '', collection, q)
+  const heading = titleFor(brand?.name ?? '', category?.name ?? '', collection, q)
 
   const filters = (
     <div className="whitepanel" style={{ padding: 20 }}>
@@ -72,7 +76,7 @@ export function ShopPage() {
       <div className="line" />
       <b className="small">Categories</b>
       <label className="checkline">
-        <input type="checkbox" checked={!categorySlug && !collection} onChange={() => update({ category: null, collection: null })} /> All Products
+        <input type="checkbox" checked={!categorySlug && !brandSlug && !collection} onChange={() => update({ category: null, brand: null, collection: null })} /> All Products
       </label>
       {state.categories
         .filter((entry) => entry.active && entry.slug !== 'new-arrivals')
@@ -83,6 +87,21 @@ export function ShopPage() {
               type="checkbox"
               checked={categorySlug === entry.slug}
               onChange={() => update({ category: categorySlug === entry.slug ? null : entry.slug, collection: null })}
+            />
+            {entry.name}
+          </label>
+        ))}
+      <div className="line" />
+      <b className="small">Brands</b>
+      {state.brands
+        .filter((entry) => entry.active)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((entry) => (
+          <label key={entry.id} className="checkline">
+            <input
+              type="checkbox"
+              checked={brandSlug === entry.slug}
+              onChange={() => update({ brand: brandSlug === entry.slug ? null : entry.slug })}
             />
             {entry.name}
           </label>

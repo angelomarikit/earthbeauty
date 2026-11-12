@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PackArt } from '@/components/product/ProductCard'
-import { categoryName } from '@/features/catalog/pricing'
+import { brandName, categoryName } from '@/features/catalog/pricing'
 import { useStore } from '@/features/store/StoreContext'
 import { formatPeso, slugify, uid } from '@/lib/format'
-import type { Category, PackStyle, Product, Variant } from '@/types'
+import type { Brand, Category, PackStyle, Product, Variant } from '@/types'
 
 export function ProductsAdminPage() {
   const { state, saveProduct, deleteProduct } = useStore()
@@ -47,7 +47,7 @@ export function ProductsAdminPage() {
         <div className="table-wrap">
           <table className="table">
             <thead>
-              <tr><th></th><th>Product</th><th>SKU</th><th>Category</th><th>Regular</th><th>Sale</th><th>Stock</th><th>Status</th><th></th></tr>
+              <tr><th></th><th>Product</th><th>SKU</th><th>Brand</th><th>Category</th><th>Regular</th><th>Sale</th><th>Stock</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {products.map((product) => (
@@ -55,6 +55,7 @@ export function ProductsAdminPage() {
                   <td><div className="thumb" style={{ width: 54, height: 54 }}>{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <PackArt type={product.pack} />}</div></td>
                   <td><b>{product.name}</b></td>
                   <td>{product.sku}</td>
+                  <td className="small">{brandName(state, product.brandId, '—')}</td>
                   <td>{categoryName(state, product.categoryId)}</td>
                   <td>{formatPeso(product.compareAtCentavos ?? product.priceCentavos)}</td>
                   <td>{formatPeso(product.priceCentavos)}</td>
@@ -93,9 +94,9 @@ export function ProductFormPage() {
   const { state, saveProduct } = useStore()
   const navigate = useNavigate()
   const existing = state.products.find((product) => product.id === id)
-  const [form, setForm] = useState<Product>(() => existing ?? blankProduct(state.categories[0]?.id ?? ''))
+  const [form, setForm] = useState<Product>(() => existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null))
   useEffect(() => {
-    setForm(existing ?? blankProduct(state.categories[0]?.id ?? ''))
+    setForm(existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null))
     // Reload the form only when the route changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -111,6 +112,7 @@ export function ProductFormPage() {
         event.preventDefault()
         if (!form.name.trim()) return setError('Enter a product name.')
         if (!form.categoryId) return setError('Choose a category.')
+        if (!form.brandId) return setError('Choose a brand.')
         const slug = slugify(form.slug || form.name)
         if (state.products.some((product) => product.slug === slug && product.id !== form.id)) return setError('That link is already used.')
         const variants = form.variants.map((variant) => ({ ...variant, stock: Math.max(0, variant.stock), priceCentavos: Math.max(0, variant.priceCentavos) }))
@@ -132,6 +134,12 @@ export function ProductFormPage() {
           <Field label="Category">
             <select className="field-input" value={form.categoryId} onChange={(event) => update('categoryId', event.target.value)}>
               {state.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Brand">
+            <select className="field-input" value={form.brandId ?? ''} onChange={(event) => update('brandId', event.target.value || null)} required>
+              <option value="">Select brand…</option>
+              {state.brands.filter((brand) => brand.active).map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
             </select>
           </Field>
           <Field label="SKU"><input className="field-input" value={form.sku} onChange={(event) => update('sku', event.target.value)} /></Field>
@@ -203,7 +211,7 @@ function blankVariant(product: Product): Variant {
   return { id: uid('var'), label: 'New size', sku: `${product.sku}-NEW`, priceCentavos: product.priceCentavos, compareAtCentavos: product.compareAtCentavos, stock: 0, active: true }
 }
 
-function blankProduct(categoryId: string): Product {
+function blankProduct(categoryId: string, brandId: string | null): Product {
   const id = uid('p')
   return {
     id,
@@ -213,6 +221,7 @@ function blankProduct(categoryId: string): Product {
     howToUse: 'Replace this text with the real directions.',
     shippingNote: 'Shipping is confirmed at checkout.',
     categoryId,
+    brandId,
     sku: `EBW-${id.slice(-4).toUpperCase()}`,
     priceCentavos: 0,
     compareAtCentavos: null,
@@ -236,6 +245,98 @@ function blankProduct(categoryId: string): Product {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <div className="form-group"><label className="fieldlabel">{label}</label>{children}</div>
+}
+
+export function BrandsAdminPage() {
+  const { state, saveBrand, deleteBrand, moveBrand } = useStore()
+  const [message, setMessage] = useState<string | null>(null)
+  const brands = [...state.brands].sort((a, b) => a.sortOrder - b.sortOrder)
+
+  function edit(brand: Brand, patch: Partial<Brand>) {
+    const error = saveBrand({ ...brand, ...patch })
+    setMessage(error)
+  }
+
+  return (
+    <>
+      <div className="between">
+        <div>
+          <div className="eyebrow">CATALOGUE</div>
+          <h1 style={{ font: '31px Georgia, serif' }}>Brands</h1>
+        </div>
+        <button
+          className="btn"
+          onClick={() => {
+            const name = window.prompt('Brand name')
+            if (!name) return
+            const error = saveBrand({
+              id: uid('brand'),
+              name,
+              slug: slugify(name),
+              logoUrl: null,
+              tint: '#fff0f7',
+              active: true,
+              sortOrder: brands.length + 1,
+              showOnHomepage: true,
+              blurb: 'View products →',
+            })
+            setMessage(error)
+          }}
+        >
+          ADD BRAND
+        </button>
+      </div>
+      {message ? <div className="notice">{message}</div> : null}
+      <div className="whitepanel" style={{ marginTop: 16, padding: 0 }}>
+        <table className="table">
+          <thead><tr><th>Logo</th><th>Name</th><th>Homepage</th><th>Active</th><th></th></tr></thead>
+          <tbody>
+            {brands.map((brand) => (
+              <tr key={brand.id}>
+                <td style={{ width: 120, verticalAlign: 'top' }}>
+                  <div className="thumb" style={{ width: 64, height: 64, borderRadius: '100%', marginBottom: 8, background: brand.tint }}>
+                    {brand.logoUrl ? <img src={brand.logoUrl} alt="" style={{ objectFit: 'contain', padding: 6 }} /> : <span className="small muted" style={{ display: 'grid', placeItems: 'center', height: '100%' }}>{brand.name.trim().charAt(0) || '?'}</span>}
+                  </div>
+                  <label className="btn outline" style={{ fontSize: 10, padding: '6px 10px', cursor: 'pointer', display: 'inline-block' }}>
+                    Upload
+                    <input type="file" accept="image/*" hidden onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) return
+                      if (file.size > 400_000) {
+                        setMessage('Choose a logo under 400 KB for this browser preview.')
+                        return
+                      }
+                      const reader = new FileReader()
+                      reader.onload = () => edit(brand, { logoUrl: String(reader.result) })
+                      reader.readAsDataURL(file)
+                      event.target.value = ''
+                    }} />
+                  </label>
+                  {brand.logoUrl ? (
+                    <button type="button" className="text-link small" style={{ display: 'block', marginTop: 6, background: 'none', border: 0 }} onClick={() => edit(brand, { logoUrl: null })}>
+                      Remove logo
+                    </button>
+                  ) : null}
+                </td>
+                <td>
+                  <input className="field-input" value={brand.name} onChange={(event) => edit(brand, { name: event.target.value, slug: slugify(event.target.value) })} />
+                  <input className="field-input" style={{ marginTop: 8 }} placeholder="Or paste logo URL (https://…)" value={brand.logoUrl ?? ''} onChange={(event) => edit(brand, { logoUrl: event.target.value || null })} />
+                  <p className="tiny muted" style={{ marginTop: 6 }}>Shown on the homepage brand slider and shop filters. Slug: {brand.slug}</p>
+                </td>
+                <td><input type="checkbox" checked={brand.showOnHomepage} onChange={(event) => edit(brand, { showOnHomepage: event.target.checked })} /></td>
+                <td><input type="checkbox" checked={brand.active} onChange={(event) => edit(brand, { active: event.target.checked })} /></td>
+                <td className="row">
+                  <button className="pill" onClick={() => moveBrand(brand.id, -1)}>Up</button>
+                  <button className="pill" onClick={() => moveBrand(brand.id, 1)}>Down</button>
+                  <button className="text-link" style={{ background: 'none', border: 0 }} onClick={() => setMessage(deleteBrand(brand.id))}>Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
 }
 
 export function CategoriesAdminPage() {

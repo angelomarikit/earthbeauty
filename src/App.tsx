@@ -7,7 +7,7 @@ import { queryClient } from '@/lib/queryClient'
 import { AdminLayout } from '@/layouts/AdminLayout'
 import { StorefrontLayout } from '@/layouts/StorefrontLayout'
 import { DashboardPage } from '@/pages/admin/DashboardPage'
-import { CategoriesAdminPage, InventoryAdminPage, ProductFormPage, ProductsAdminPage } from '@/pages/admin/CatalogPages'
+import { BrandsAdminPage, CategoriesAdminPage, InventoryAdminPage, ProductFormPage, ProductsAdminPage } from '@/pages/admin/CatalogPages'
 import { CustomersAdminPage, MarketingAdminPage, OrderAdminDetailPage, OrdersAdminPage, ReportsAdminPage, SettingsAdminPage } from '@/pages/admin/OperationsPages'
 import { ForgotPasswordPage, LoginPage, RegisterPage } from '@/pages/auth/AuthPages'
 import { AccountPage, OrderConfirmationPage, OrderTrackingPage, TrackLookupPage, WishlistPage } from '@/pages/storefront/AccountPages'
@@ -50,6 +50,7 @@ export function App() {
                   <Route path="products/new" element={<ProductFormPage />} />
                   <Route path="products/:id" element={<ProductFormPage />} />
                   <Route path="categories" element={<CategoriesAdminPage />} />
+                  <Route path="brands" element={<BrandsAdminPage />} />
                   <Route path="inventory" element={<InventoryAdminPage />} />
                   <Route path="orders" element={<OrdersAdminPage />} />
                   <Route path="orders/:id" element={<OrderAdminDetailPage />} />

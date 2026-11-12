@@ -1,6 +1,6 @@
 import { buildSeed } from '@/data/demo/seed'
 import { getSupabase } from '@/lib/supabase'
-import type { DemoState, Order, PackStyle, Product } from '@/types'
+import type { Brand, DemoState, Order, PackStyle, Product } from '@/types'
 
 type Row = Record<string, unknown>
 
@@ -22,6 +22,7 @@ function mapProduct(row: Row): Product {
     howToUse: asText(row.how_to_use),
     shippingNote: asText(row.shipping_note),
     categoryId: asText(row.category_id),
+    brandId: row.brand_id == null ? null : asText(row.brand_id),
     sku: asText(row.sku),
     priceCentavos: asNumber(row.price_centavos),
     compareAtCentavos: row.compare_at_centavos == null ? null : asNumber(row.compare_at_centavos),
@@ -58,13 +59,15 @@ export async function loadProductionState(): Promise<DemoState> {
   const supabase = getSupabase()
   if (!supabase) throw new Error('Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before using production mode.')
   const base = buildSeed()
-  const [categories, products, orders, settings] = await Promise.all([
+  const [categories, brands, products, orders, settings] = await Promise.all([
     supabase.from('categories').select('*').order('sort_order'),
+    supabase.from('brands').select('*').order('sort_order'),
     supabase.from('products').select('*, product_variants(*)').order('created_at', { ascending: false }),
     supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }),
     supabase.from('store_settings').select('*').limit(1).maybeSingle(),
   ])
   if (categories.error) throw new Error(categories.error.message)
+  if (brands.error) throw new Error(brands.error.message)
   if (products.error) throw new Error(products.error.message)
   if (orders.error) throw new Error(orders.error.message)
 
@@ -82,6 +85,17 @@ export async function loadProductionState(): Promise<DemoState> {
       showOnHomepage: Boolean(row.show_on_homepage),
       showInNav: Boolean(row.show_in_nav),
       blurb: asText(row.blurb, 'Shop collection →'),
+    })),
+    brands: (brands.data ?? []).map((row) => ({
+      id: asText(row.id),
+      name: asText(row.name),
+      slug: asText(row.slug),
+      logoUrl: row.logo_url == null ? null : asText(row.logo_url),
+      tint: asText(row.tint, '#fff0f7'),
+      active: Boolean(row.active),
+      sortOrder: asNumber(row.sort_order),
+      showOnHomepage: Boolean(row.show_on_homepage),
+      blurb: asText(row.blurb, 'View products →'),
     })),
     products: (products.data ?? []).map((row) => mapProduct(row as Row)),
     orders: (orders.data ?? []).map((row) => mapOrder(row as Row)),
@@ -163,6 +177,55 @@ function mapOrder(row: Row): Order {
 export async function productionSave(kind: string, payload: unknown) {
   const supabase = getSupabase()
   if (!supabase) return
+  if (kind === 'brand') {
+    const brand = payload as Brand
+    const { error } = await supabase.from('brands').upsert({
+      id: brand.id,
+      name: brand.name,
+      slug: brand.slug,
+      logo_url: brand.logoUrl,
+      tint: brand.tint,
+      blurb: brand.blurb,
+      active: brand.active,
+      sort_order: brand.sortOrder,
+      show_on_homepage: brand.showOnHomepage,
+    })
+    if (error) throw new Error(error.message)
+    return
+  }
+  if (kind === 'delete-brand') {
+    const { id } = payload as { id: string }
+    const { error } = await supabase.from('brands').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    return
+  }
+  if (kind === 'product') {
+    const product = payload as Product
+    const { error } = await supabase.from('products').upsert({
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      how_to_use: product.howToUse,
+      shipping_note: product.shippingNote,
+      category_id: product.categoryId,
+      brand_id: product.brandId,
+      sku: product.sku,
+      price_centavos: product.priceCentavos,
+      compare_at_centavos: product.compareAtCentavos,
+      stock: product.stock,
+      badge: product.badge,
+      pack: product.pack,
+      gallery: product.gallery,
+      image_url: product.imageUrl,
+      featured: product.featured,
+      is_new: product.isNew,
+      best_seller: product.bestSeller,
+      active: product.active,
+    })
+    if (error) throw new Error(error.message)
+    return
+  }
   if (kind === 'settings') {
     const settings = payload as DemoState['settings']
     const { error } = await supabase.from('store_settings').upsert({

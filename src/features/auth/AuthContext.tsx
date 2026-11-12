@@ -6,6 +6,35 @@ import type { DemoUser } from '@/types'
 
 const SESSION_KEY = 'ebw-session-v1'
 
+type ProductionSession = {
+  id: string
+  email: string
+  name: string
+  phone: string
+  role: DemoUser['role']
+}
+
+async function loadProductionSession(): Promise<ProductionSession | null> {
+  const supabase = getSupabase()
+  if (!supabase) return null
+  const { data: sessionData } = await supabase.auth.getSession()
+  const authUser = sessionData.session?.user
+  if (!authUser) return null
+  const email = authUser.email ?? ''
+  const [{ data: profile }, { data: roleRow }] = await Promise.all([
+    supabase.from('profiles').select('full_name, phone').eq('id', authUser.id).maybeSingle(),
+    supabase.from('user_roles').select('role').eq('user_id', authUser.id).maybeSingle(),
+  ])
+  const role = roleRow?.role === 'admin' ? 'admin' : 'customer'
+  return {
+    id: authUser.id,
+    email,
+    name: profile?.full_name?.trim() || email,
+    phone: profile?.phone ?? '',
+    role,
+  }
+}
+
 type AuthValue = {
   user: DemoUser | null
   login: (email: string, password: string) => Promise<string | null>
@@ -19,35 +48,37 @@ const AuthContext = createContext<AuthValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { state, mode, registerUser } = useStore()
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
-  const [remoteEmail, setRemoteEmail] = useState<string | null>(null)
+  const [productionUser, setProductionUser] = useState<ProductionSession | null>(null)
 
   useEffect(() => {
     if (mode !== 'production') return
     const supabase = getSupabase()
     if (!supabase) return
-    void supabase.auth.getSession().then(({ data }) => {
-      setRemoteEmail(data.session?.user.email ?? null)
+    void loadProductionSession().then(setProductionUser)
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+      void loadProductionSession().then(setProductionUser)
     })
+    return () => subscription.subscription.unsubscribe()
   }, [mode])
 
   const user = useMemo(() => {
     const local = state.users.find((entry) => entry.id === userId) ?? null
     if (local) return local
-    if (remoteEmail) {
+    if (productionUser) {
       return {
-        id: 'remote',
-        name: remoteEmail,
-        email: remoteEmail,
-        phone: '',
+        id: productionUser.id,
+        name: productionUser.name,
+        email: productionUser.email,
+        phone: productionUser.phone,
         password: '',
-        role: 'customer' as const,
+        role: productionUser.role,
         memberSince: '2026',
         addresses: [],
         demo: true as const,
       }
     }
     return null
-  }, [remoteEmail, state.users, userId])
+  }, [productionUser, state.users, userId])
 
   const api = useMemo<AuthValue>(
     () => ({
@@ -58,7 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!supabase) return 'Supabase is not configured.'
           const { error } = await supabase.auth.signInWithPassword({ email, password })
           if (error) return error.message
-          setRemoteEmail(email)
+          const session = await loadProductionSession()
+          flushSync(() => setProductionUser(session))
           return null
         }
         const found = state.users.find((entry) => entry.email.toLowerCase() === email.toLowerCase() && entry.password === password)
@@ -70,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout: async () => {
         if (mode === 'production') await getSupabase()?.auth.signOut()
         setUserId(null)
-        setRemoteEmail(null)
+        setProductionUser(null)
         localStorage.removeItem(SESSION_KEY)
       },
       register: async (input) => {

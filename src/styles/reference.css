@@ -315,8 +315,55 @@ ul { margin: 0; padding: 0; }
   overflow: hidden;
 }
 .cat-img img { width: 100%; height: 100%; object-fit: cover; }
+.brand-slide .cat-img img { object-fit: contain; padding: 6px; background: #fff; }
 .cat strong { display: block; font-size: 12px; }
 .cat small { display: block; color: #9a8c8f; font-size: 10px; margin-top: 5px; }
+
+.brand-slider {
+  overflow: hidden;
+  margin-inline: -22px;
+  padding-block: 4px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.brand-slider-track {
+  display: flex;
+  width: max-content;
+  gap: 14px;
+  padding-inline: 22px;
+  animation: brand-marquee 55s linear infinite;
+  will-change: transform;
+}
+.brand-slider:hover .brand-slider-track { animation-play-state: paused; }
+.brand-slide {
+  flex: 0 0 168px;
+  width: 168px;
+  min-height: 100%;
+}
+.brand-slide strong {
+  font-size: 11px;
+  line-height: 1.25;
+  padding-inline: 2px;
+}
+@keyframes brand-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-slider {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+  }
+  .brand-slider-track {
+    animation: none;
+    padding-inline: 22px;
+  }
+  .brand-slide { scroll-snap-align: start; }
+}
+
 .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
 .product-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .product-grid .product:nth-child(2n) .pimg { background: linear-gradient(150deg, #fff0f7, #fff9fc); }
@@ -921,6 +968,9 @@ textarea.field-input { min-height: 110px; resize: vertical; }
 @media (max-width: 650px) {
   body { overflow-x: hidden; }
   .wrap { padding: 0 15px; }
+  .brand-slider { margin-inline: -15px; }
+  .brand-slider-track { padding-inline: 15px; gap: 9px; }
+  .brand-slide { flex: 0 0 140px; width: 140px; }
   .promo { font-size: 10px; padding: 8px 12px; }
   .topbar, .nav { display: none; }
   .header-inner { min-height: 65px; gap: 12px; flex-wrap: wrap; padding: 10px 0 13px; }

@@ -1,6 +1,7 @@
 import { Heart, Sparkles, Truck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ProductGrid } from '@/components/product/ProductCard'
+import { BrandSlider } from '@/components/storefront/BrandSlider'
 import { useStore } from '@/features/store/StoreContext'
 import { usePageMeta } from '@/lib/seo'
 
@@ -11,6 +12,12 @@ export function HomePage() {
   const favorites = state.products.filter((product) => product.active && product.featured).slice(0, 4)
   const arrivals = state.products.filter((product) => product.active && product.isNew).slice(0, 4)
   const categories = state.categories.filter((category) => category.active && category.showOnHomepage).sort((a, b) => a.sortOrder - b.sortOrder)
+  const brandCollections = state.brands.filter((brand) => brand.active && brand.showOnHomepage).sort((a, b) => a.sortOrder - b.sortOrder)
+
+  function brandMark(name: string) {
+    const letter = name.trim().charAt(0)
+    return letter ? letter.toUpperCase() : '✦'
+  }
 
   if (loading) {
     return (
@@ -60,6 +67,17 @@ export function HomePage() {
               </Link>
             ))}
           </div>
+        </section>
+
+        <section className="section">
+          <div className="section-title">
+            <div>
+              <div className="eyebrow">SHOP BY BRAND</div>
+              <h2>Brand Collections</h2>
+            </div>
+            <Link to="/shop">VIEW ALL PRODUCTS →</Link>
+          </div>
+          <BrandSlider brands={brandCollections} brandMark={brandMark} />
         </section>
 
         <div className="perks">

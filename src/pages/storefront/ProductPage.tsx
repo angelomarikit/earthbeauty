@@ -2,7 +2,7 @@ import { Heart, ShoppingBag, Truck } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PackArt, PriceDisplay, ProductGrid } from '@/components/product/ProductCard'
-import { availableStock, comparePrice, unitPrice } from '@/features/catalog/pricing'
+import { availableStock, brandName, comparePrice, unitPrice } from '@/features/catalog/pricing'
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { usePageMeta } from '@/lib/seo'
@@ -20,11 +20,12 @@ export function ProductPage() {
   const [tab, setTab] = useState<'description' | 'use' | 'shipping'>('description')
   const [message, setMessage] = useState<string | null>(null)
   const category = state.categories.find((entry) => entry.id === product?.categoryId)
+  const supplierBrand = product ? brandName(state, product.brandId, state.settings.legalName) : state.settings.legalName
   const variant = product?.variants.find((entry) => entry.id === (variantId ?? product.variants[0]?.id)) ?? product?.variants[0]
   const stock = product && variant ? availableStock(product, variant) : 0
   const wished = product ? saved.includes(product.id) : false
 
-  usePageMeta(product ? `${product.name} · Earth Beauty & Wellness` : 'Product', product?.description ?? 'Product')
+  usePageMeta(product ? `${product.name} · ${supplierBrand}` : 'Product', product?.description ?? 'Product')
 
   const related = useMemo(() => {
     if (!product) return []
@@ -80,7 +81,7 @@ export function ProductPage() {
             </div>
           </div>
           <div>
-            <div className="eyebrow">EARTH BEAUTY & WELLNESS · {category?.name.toUpperCase()}</div>
+            <div className="eyebrow">{supplierBrand} · {category?.name.toUpperCase()}</div>
             <h1 style={{ font: 'normal 40px/1.14 Georgia, serif', margin: '16px 0' }}>{product.name}</h1>
             <div className="small muted">SKU {variant.sku}</div>
             {product.demoSoldLabel ? (

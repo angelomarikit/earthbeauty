@@ -14,6 +14,18 @@ export type Category = {
   blurb: string
 }
 
+export type Brand = {
+  id: string
+  name: string
+  slug: string
+  logoUrl: string | null
+  tint: string
+  active: boolean
+  sortOrder: number
+  showOnHomepage: boolean
+  blurb: string
+}
+
 export type Variant = {
   id: string
   label: string
@@ -32,6 +44,7 @@ export type Product = {
   howToUse: string
   shippingNote: string
   categoryId: string
+  brandId: string | null
   sku: string
   priceCentavos: number
   compareAtCentavos: number | null
@@ -217,6 +230,7 @@ export type DemoState = {
   seedVersion: number
   nextOrderSeq: number
   categories: Category[]
+  brands: Brand[]
   products: Product[]
   orders: Order[]
   users: DemoUser[]

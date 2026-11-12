@@ -1,8 +1,9 @@
 import { Heart, ShoppingBag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { comparePrice, unitPrice } from '@/features/catalog/pricing'
+import { brandName, comparePrice, unitPrice } from '@/features/catalog/pricing'
 import { useCart } from '@/features/cart/CartContext'
+import { useStore } from '@/features/store/StoreContext'
 import { formatPeso } from '@/lib/format'
 import type { PackStyle, Product } from '@/types'
 
@@ -29,6 +30,7 @@ export function PriceDisplay({
 }
 
 export function ProductCard({ product }: { product: Product }) {
+  const { state } = useStore()
   const { add, saved, toggleSaved } = useCart()
   const [message, setMessage] = useState<string | null>(null)
   const variant = product.variants[0]
@@ -60,7 +62,7 @@ export function ProductCard({ product }: { product: Product }) {
         </button>
       </div>
       <Link to={`/product/${product.slug}`} className="pbody">
-        <div className="brand-label">EARTH BEAUTY & WELLNESS</div>
+        <div className="brand-label">{brandName(state, product.brandId, state.settings.legalName)}</div>
         <h3>{product.name}</h3>
         <PriceDisplay price={unitPrice(product, variant)} compare={comparePrice(product, variant)} />
         {product.demoSoldLabel ? (

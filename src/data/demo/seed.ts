@@ -1,5 +1,6 @@
 import type {
   Banner,
+  Brand,
   Category,
   Coupon,
   DemoState,
@@ -26,11 +27,31 @@ const categories: Category[] = [
   { id: 'cat-acc', name: 'Accessories', slug: 'accessories', symbol: '◈', tint: '#f3eee8', imageUrl: null, active: true, sortOrder: 8, showOnHomepage: false, showInNav: false, blurb: 'Shop collection →' },
 ]
 
+const brands: Brand[] = [
+  { id: 'brand-brilliant', name: 'BRILLIANT SKIN ESSENTIALS', slug: 'brilliant-skin-essentials', logoUrl: null, tint: '#fff0f7', active: true, sortOrder: 1, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-you-glow', name: 'YOU GLOW BABE', slug: 'you-glow-babe', logoUrl: null, tint: '#eff8ea', active: true, sortOrder: 2, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-bmrs', name: 'BMRS', slug: 'bmrs', logoUrl: null, tint: '#fff9fc', active: true, sortOrder: 3, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-kserene', name: 'KSERENE', slug: 'kserene', logoUrl: null, tint: '#fff0f7', active: true, sortOrder: 4, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-hamisan', name: 'HAMISAN BY JOLINA', slug: 'hamisan-by-jolina', logoUrl: null, tint: '#eff8ea', active: true, sortOrder: 5, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-perfect-skin', name: 'PERFECT SKIN', slug: 'perfect-skin', logoUrl: null, tint: '#f7fbf4', active: true, sortOrder: 6, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-hikari', name: 'HIKARI SKIN ESSENTIALS', slug: 'hikari-skin-essentials', logoUrl: null, tint: '#fff0f7', active: true, sortOrder: 7, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-perfect-formula', name: 'PERFECT FORMULA', slug: 'perfect-formula', logoUrl: null, tint: '#eff8ea', active: true, sortOrder: 8, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-saskin', name: 'SASKIN', slug: 'saskin', logoUrl: null, tint: '#fff9fc', active: true, sortOrder: 9, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-hya-glow', name: 'HYA GLOW', slug: 'hya-glow', logoUrl: null, tint: '#fff0f7', active: true, sortOrder: 10, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-escenzia', name: 'ESCENZIA PERFUMES', slug: 'escenzia-perfumes', logoUrl: null, tint: '#eff8ea', active: true, sortOrder: 11, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-aromaverse', name: 'AROMAVERSE PERFUMES', slug: 'aromaverse-perfumes', logoUrl: null, tint: '#f7fbf4', active: true, sortOrder: 12, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-skeencare', name: 'SKEENCARE', slug: 'skeencare', logoUrl: null, tint: '#fff0f7', active: true, sortOrder: 13, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-aamarah', name: 'AAMARAH BEAUTY', slug: 'aamarah-beauty', logoUrl: null, tint: '#eff8ea', active: true, sortOrder: 14, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-queen-white', name: 'QUEEN WHITE', slug: 'queen-white', logoUrl: null, tint: '#fff9fc', active: true, sortOrder: 15, showOnHomepage: true, blurb: 'View products →' },
+  { id: 'brand-beauty-vault', name: 'BEAUTY VAULT', slug: 'beauty-vault', logoUrl: null, tint: '#fff0f7', active: true, sortOrder: 16, showOnHomepage: true, blurb: 'View products →' },
+]
+
 type Draft = {
   id: string
   name: string
   slug: string
   categoryId: string
+  brandId?: string
   price: number
   compare?: number
   stock: number
@@ -70,10 +91,10 @@ function variantsFor(draft: Draft, sku: string): Variant[] {
 }
 
 const drafts: Draft[] = [
-  { id: 'p-serum', name: 'Radiance Glow Facial Serum', slug: 'radiance-glow-facial-serum', categoryId: 'cat-skin', price: 499, compare: 699, stock: 24, pack: 'bottle', badge: 'NEW', featured: true, sold: 120, description: 'A lightweight facial serum for a simple daily routine. Demonstration product — not live inventory.', variants: [{ label: '30 ml', stock: 16 }, { label: '50 ml', price: 699, stock: 8 }] },
-  { id: 'p-butter', name: 'Nourishing Body Butter', slug: 'nourishing-body-butter', categoryId: 'cat-body', price: 349, compare: 449, stock: 40, pack: 'jar', badge: '-22%', featured: true, sold: 118, description: 'A rich body butter for after-bath moisture. Demonstration product — not live inventory.', variants: [{ label: 'Standard Size', stock: 28 }, { label: 'Travel Size', price: 199, stock: 12 }] },
-  { id: 'p-cleanser', name: 'Daily Botanical Cleanser', slug: 'daily-botanical-cleanser', categoryId: 'cat-skin', price: 299, compare: 399, stock: 36, pack: 'tall', badge: 'BEST', featured: true, bestSeller: true, sold: 132, description: 'A gentle daily cleanser with a soft lather. Demonstration product — not live inventory.' },
-  { id: 'p-rose', name: 'Hydrating Rose Cream', slug: 'hydrating-rose-cream', categoryId: 'cat-face', price: 459, compare: 599, stock: 22, pack: 'tube', badge: 'SALE', featured: true, sold: 110, description: 'A cushiony face cream for the last step of a routine. Demonstration product — not live inventory.' },
+  { id: 'p-serum', name: 'Radiance Glow Facial Serum', slug: 'radiance-glow-facial-serum', categoryId: 'cat-skin', brandId: 'brand-brilliant', price: 499, compare: 699, stock: 24, pack: 'bottle', badge: 'NEW', featured: true, sold: 120, description: 'A lightweight facial serum for a simple daily routine. Demonstration product — not live inventory.', variants: [{ label: '30 ml', stock: 16 }, { label: '50 ml', price: 699, stock: 8 }] },
+  { id: 'p-butter', name: 'Nourishing Body Butter', slug: 'nourishing-body-butter', categoryId: 'cat-body', brandId: 'brand-you-glow', price: 349, compare: 449, stock: 40, pack: 'jar', badge: '-22%', featured: true, sold: 118, description: 'A rich body butter for after-bath moisture. Demonstration product — not live inventory.', variants: [{ label: 'Standard Size', stock: 28 }, { label: 'Travel Size', price: 199, stock: 12 }] },
+  { id: 'p-cleanser', name: 'Daily Botanical Cleanser', slug: 'daily-botanical-cleanser', categoryId: 'cat-skin', brandId: 'brand-kserene', price: 299, compare: 399, stock: 36, pack: 'tall', badge: 'BEST', featured: true, bestSeller: true, sold: 132, description: 'A gentle daily cleanser with a soft lather. Demonstration product — not live inventory.' },
+  { id: 'p-rose', name: 'Hydrating Rose Cream', slug: 'hydrating-rose-cream', categoryId: 'cat-face', brandId: 'brand-hamisan', price: 459, compare: 599, stock: 22, pack: 'tube', badge: 'SALE', featured: true, sold: 110, description: 'A cushiony face cream for the last step of a routine. Demonstration product — not live inventory.' },
   { id: 'p-sun', name: 'Glow Defense Sunscreen SPF50', slug: 'glow-defense-sunscreen-spf50', categoryId: 'cat-skin', price: 389, compare: 489, stock: 30, pack: 'tube', badge: 'NEW', isNew: true, sold: 96, description: 'A daily sunscreen for daytime wear. SPF figure is placeholder copy until the real label is supplied. Demonstration product — not live inventory.', variants: [{ label: '40 ml', stock: 18 }, { label: '60 ml', price: 489, stock: 12 }] },
   { id: 'p-toner', name: 'Calming Botanical Toner', slug: 'calming-botanical-toner', categoryId: 'cat-skin', price: 329, compare: 429, stock: 27, pack: 'tall', badge: '-20%', isNew: true, sold: 88, description: 'A watery toner used after cleansing. Demonstration product — not live inventory.' },
   { id: 'p-night', name: 'Rose Renewal Night Cream', slug: 'rose-renewal-night-cream', categoryId: 'cat-face', price: 529, compare: 679, stock: 18, pack: 'jar', badge: 'BEST', isNew: true, bestSeller: true, sold: 104, description: 'An evening face cream with a soft rose scent story. Demonstration product — not live inventory.' },
@@ -109,6 +130,7 @@ const products: Product[] = drafts.map((draft, index) => {
     howToUse: 'Use as directed on the final product label. This demonstration copy is not an instruction for a real formula.',
     shippingNote: 'Shipping fee and delivery timing are confirmed at checkout. This preview does not promise a delivery window.',
     categoryId: draft.categoryId,
+    brandId: draft.brandId ?? null,
     sku,
     priceCentavos: pesosToCentavos(draft.price),
     compareAtCentavos: draft.compare ? pesosToCentavos(draft.compare) : null,
@@ -452,6 +474,7 @@ export function buildSeed(): DemoState {
     seedVersion: SEED_VERSION,
     nextOrderSeq: 1025,
     categories,
+    brands,
     products,
     orders,
     users,
