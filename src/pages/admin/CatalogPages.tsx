@@ -158,7 +158,7 @@ export function ProductFormPage() {
         <h1 style={{ font: '31px Georgia, serif' }}>{existing ? 'Edit product' : 'Add product'}</h1>
         <button className="btn" type="submit" disabled={saving}>{saving ? 'SAVING…' : 'SAVE PRODUCT'}</button>
       </div>
-      {error ? <div className="notice">{error}</div> : null}
+      {error ? <div className="form-error" style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: '#fff5f8' }}>{error}</div> : null}
       <div className="grid2">
         <div className="whitepanel">
           <Field label="Product name"><input className="field-input" value={form.name} onChange={(event) => { update('name', event.target.value); if (!existing) update('slug', slugify(event.target.value)) }} /></Field>

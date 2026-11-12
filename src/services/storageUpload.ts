@@ -7,6 +7,13 @@ const QR_BUCKET = 'payment-qr'
 
 const MAX_IMAGE_BYTES = 5_000_000
 
+function storageErrorMessage(message: string, bucket: string) {
+  if (/bucket not found/i.test(message)) {
+    return `Storage bucket "${bucket}" does not exist. In Supabase → Storage → New bucket, create "${bucket}" (public for product images). Then run supabase/migrations/0006_storage_policies.sql in the SQL Editor.`
+  }
+  return message
+}
+
 function extensionFor(file: File) {
   const fromName = file.name.split('.').pop()?.toLowerCase()
   if (fromName && fromName.length <= 5) return fromName
@@ -26,7 +33,7 @@ async function uploadFile(bucket: string, path: string, file: File, upsert: bool
     upsert,
     contentType: file.type || undefined,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(storageErrorMessage(error.message, bucket))
   if (bucket === PRODUCT_BUCKET) {
     const { data } = supabase.storage.from(bucket).getPublicUrl(path)
     return { path, publicUrl: data.publicUrl }
