@@ -1,3 +1,4 @@
+import { AdminConfirmModal } from '@/components/admin/AdminModal'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, XAxis } from 'recharts'
@@ -251,6 +252,8 @@ export function CustomersAdminPage() {
 
 export function MarketingAdminPage() {
   const { state, saveBanner, deleteBanner, saveCoupon, deleteCoupon, saveProduct } = useStore()
+  const [pendingDeleteBanner, setPendingDeleteBanner] = useState<Banner | null>(null)
+  const [pendingDeleteCoupon, setPendingDeleteCoupon] = useState<Coupon | null>(null)
   return (
     <>
       <div className="eyebrow">PROMOTIONS</div>
@@ -265,7 +268,7 @@ export function MarketingAdminPage() {
               <input className="field-input" style={{ marginTop: 8 }} value={banner.buttonLabel} onChange={(event) => saveBanner({ ...banner, buttonLabel: event.target.value })} />
               <input className="field-input" style={{ marginTop: 8 }} value={banner.href} onChange={(event) => saveBanner({ ...banner, href: event.target.value })} />
               <label className="checkline"><input type="checkbox" checked={banner.active} onChange={(event) => saveBanner({ ...banner, active: event.target.checked })} /> Active</label>
-              <button type="button" className="btn-action danger" onClick={() => deleteBanner(banner.id)}>Remove</button>
+              <button type="button" className="btn-action danger" onClick={() => setPendingDeleteBanner(banner)}>Remove</button>
             </div>
           ))}
         </div>
@@ -276,7 +279,7 @@ export function MarketingAdminPage() {
               <div key={coupon.id} className="between" style={{ marginTop: 10 }}>
                 <input className="field-input" value={coupon.code} onChange={(event) => saveCoupon({ ...coupon, code: event.target.value.toUpperCase() })} />
                 <label className="checkline"><input type="checkbox" checked={coupon.active} onChange={(event) => saveCoupon({ ...coupon, active: event.target.checked })} /> Active</label>
-                <button type="button" className="btn-action danger" onClick={() => deleteCoupon(coupon.id)}>Remove</button>
+                <button type="button" className="btn-action danger" onClick={() => setPendingDeleteCoupon(coupon)}>Remove</button>
               </div>
             ))}
           </div>
@@ -290,6 +293,28 @@ export function MarketingAdminPage() {
           </div>
         </div>
       </div>
+      <AdminConfirmModal
+        open={Boolean(pendingDeleteBanner)}
+        title={pendingDeleteBanner ? `Remove banner “${pendingDeleteBanner.title}”?` : 'Remove banner?'}
+        description="This removes the banner from the homepage rotation."
+        confirmLabel="REMOVE"
+        danger
+        onClose={() => setPendingDeleteBanner(null)}
+        onConfirm={() => {
+          if (pendingDeleteBanner) deleteBanner(pendingDeleteBanner.id)
+        }}
+      />
+      <AdminConfirmModal
+        open={Boolean(pendingDeleteCoupon)}
+        title={pendingDeleteCoupon ? `Remove coupon ${pendingDeleteCoupon.code}?` : 'Remove coupon?'}
+        description="Shoppers will no longer be able to use this code."
+        confirmLabel="REMOVE"
+        danger
+        onClose={() => setPendingDeleteCoupon(null)}
+        onConfirm={() => {
+          if (pendingDeleteCoupon) deleteCoupon(pendingDeleteCoupon.id)
+        }}
+      />
     </>
   )
 }
@@ -373,6 +398,7 @@ export function ReportsAdminPage() {
 export function SettingsAdminPage() {
   const { state, saveSettings, saveShipping, resetDemo, mode } = useStore()
   const [form, setForm] = useState<StoreSettings>(state.settings)
+  const [resetOpen, setResetOpen] = useState(false)
   useEffect(() => {
     setForm(state.settings)
   }, [state.settings])
@@ -452,7 +478,20 @@ export function SettingsAdminPage() {
           </div>
         ))}
       </div>
-      {mode === 'demo' ? <button className="btn outline" style={{ marginTop: 16 }} onClick={resetDemo}>RESET DEMONSTRATION DATA</button> : null}
+      {mode === 'demo' ? (
+        <button type="button" className="btn outline" style={{ marginTop: 16 }} onClick={() => setResetOpen(true)}>
+          RESET DEMONSTRATION DATA
+        </button>
+      ) : null}
+      <AdminConfirmModal
+        open={resetOpen}
+        title="Reset demonstration data?"
+        description="This reloads the sample catalogue, orders, and settings in this browser. This cannot be undone."
+        confirmLabel="RESET"
+        danger
+        onClose={() => setResetOpen(false)}
+        onConfirm={() => resetDemo()}
+      />
     </>
   )
 }

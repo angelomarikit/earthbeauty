@@ -903,6 +903,18 @@ textarea.field-input { min-height: 110px; resize: vertical; }
 .pay-option.on { border-color: var(--primary); background: #fef8fa; }
 .pay-option + .pay-option { margin-top: 12px; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(48, 41, 46, 0.35); z-index: 55; }
+.admin-modal {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px 26px;
+  box-shadow: 0 24px 60px rgba(48, 41, 46, 0.22);
+}
 .drawer {
   position: fixed;
   z-index: 56;

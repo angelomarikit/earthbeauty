@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { AdminConfirmModal, AdminTextPromptModal } from '@/components/admin/AdminModal'
 import { FileUploadField } from '@/components/forms/FileUploadField'
 import { PackArt } from '@/components/product/ProductCard'
 import { brandName, categoryName } from '@/features/catalog/pricing'
@@ -78,19 +79,21 @@ export function ProductsAdminPage() {
           </table>
         </div>
       </div>
-      {pendingDelete ? (
-        <>
-          <button className="drawer-backdrop" aria-label="Close" onClick={() => setPendingDelete(null)} />
-          <div className="whitepanel" style={{ position: 'fixed', zIndex: 70, left: '50%', top: '30%', transform: 'translateX(-50%)', width: 420 }}>
-            <h3>Delete {pendingDelete.name}?</h3>
-            <p className="muted small">{mode === 'production' ? 'This permanently removes the product from your catalogue.' : 'This removes it from the demonstration catalogue in this browser.'}</p>
-            <div className="row" style={{ marginTop: 16 }}>
-              <button className="btn" onClick={() => { deleteProduct(pendingDelete.id); setPendingDelete(null) }}>DELETE</button>
-              <button className="btn outline" onClick={() => setPendingDelete(null)}>CANCEL</button>
-            </div>
-          </div>
-        </>
-      ) : null}
+      <AdminConfirmModal
+        open={Boolean(pendingDelete)}
+        title={pendingDelete ? `Delete ${pendingDelete.name}?` : 'Delete product?'}
+        description={
+          mode === 'production'
+            ? 'This permanently removes the product from your catalogue.'
+            : 'This removes it from the demonstration catalogue in this browser.'
+        }
+        confirmLabel="DELETE"
+        danger
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) deleteProduct(pendingDelete.id)
+        }}
+      />
     </>
   )
 }
@@ -283,6 +286,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 export function BrandsAdminPage() {
   const { state, saveBrand, deleteBrand, moveBrand, mode } = useStore()
   const [message, setMessage] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [pendingDeleteBrand, setPendingDeleteBrand] = useState<Brand | null>(null)
   const brands = [...state.brands].sort((a, b) => a.sortOrder - b.sortOrder)
 
   function edit(brand: Brand, patch: Partial<Brand>) {
@@ -297,25 +302,7 @@ export function BrandsAdminPage() {
           <div className="eyebrow">CATALOGUE</div>
           <h1 style={{ font: '31px Georgia, serif' }}>Brands</h1>
         </div>
-        <button
-          className="btn"
-          onClick={() => {
-            const name = window.prompt('Brand name')
-            if (!name) return
-            const error = saveBrand({
-              id: mode === 'production' ? entityUuid() : uid('brand'),
-              name,
-              slug: slugify(name),
-              logoUrl: null,
-              tint: '#fff0f7',
-              active: true,
-              sortOrder: brands.length + 1,
-              showOnHomepage: true,
-              blurb: 'View products →',
-            })
-            setMessage(error)
-          }}
-        >
+        <button type="button" className="btn" onClick={() => setAddOpen(true)}>
           ADD BRAND
         </button>
       </div>
@@ -373,7 +360,7 @@ export function BrandsAdminPage() {
                   <div className="action-row">
                     <button type="button" className="pill" onClick={() => moveBrand(brand.id, -1)}>Up</button>
                     <button type="button" className="pill" onClick={() => moveBrand(brand.id, 1)}>Down</button>
-                    <button type="button" className="btn-action danger" onClick={() => setMessage(deleteBrand(brand.id))}>Delete</button>
+                    <button type="button" className="btn-action danger" onClick={() => setPendingDeleteBrand(brand)}>Delete</button>
                   </div>
                 </td>
               </tr>
@@ -381,6 +368,39 @@ export function BrandsAdminPage() {
           </tbody>
         </table>
       </div>
+      <AdminTextPromptModal
+        open={addOpen}
+        title="Add brand"
+        label="Brand name"
+        placeholder="e.g. Brilliant Skin"
+        submitLabel="ADD BRAND"
+        onClose={() => setAddOpen(false)}
+        onSubmit={(name) => {
+          const error = saveBrand({
+            id: mode === 'production' ? entityUuid() : uid('brand'),
+            name,
+            slug: slugify(name),
+            logoUrl: null,
+            tint: '#fff0f7',
+            active: true,
+            sortOrder: brands.length + 1,
+            showOnHomepage: true,
+            blurb: 'View products →',
+          })
+          setMessage(error)
+        }}
+      />
+      <AdminConfirmModal
+        open={Boolean(pendingDeleteBrand)}
+        title={pendingDeleteBrand ? `Delete ${pendingDeleteBrand.name}?` : 'Delete brand?'}
+        description="Products still linked to this brand must be moved or removed first."
+        confirmLabel="DELETE"
+        danger
+        onClose={() => setPendingDeleteBrand(null)}
+        onConfirm={() => {
+          if (pendingDeleteBrand) setMessage(deleteBrand(pendingDeleteBrand.id))
+        }}
+      />
     </>
   )
 }
@@ -388,6 +408,8 @@ export function BrandsAdminPage() {
 export function CategoriesAdminPage() {
   const { state, saveCategory, deleteCategory, moveCategory, mode } = useStore()
   const [message, setMessage] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [pendingDeleteCategory, setPendingDeleteCategory] = useState<Category | null>(null)
   const categories = [...state.categories].sort((a, b) => a.sortOrder - b.sortOrder)
 
   function edit(category: Category, patch: Partial<Category>) {
@@ -402,27 +424,7 @@ export function CategoriesAdminPage() {
           <div className="eyebrow">CATALOGUE</div>
           <h1 style={{ font: '31px Georgia, serif' }}>Categories</h1>
         </div>
-        <button
-          className="btn"
-          onClick={() => {
-            const name = window.prompt('Category name')
-            if (!name) return
-            const error = saveCategory({
-              id: mode === 'production' ? entityUuid() : uid('cat'),
-              name,
-              slug: slugify(name),
-              symbol: '✦',
-              tint: '#faeaf0',
-              imageUrl: null,
-              active: true,
-              sortOrder: categories.length + 1,
-              showOnHomepage: false,
-              showInNav: false,
-              blurb: 'Shop collection →',
-            })
-            setMessage(error)
-          }}
-        >
+        <button type="button" className="btn" onClick={() => setAddOpen(true)}>
           ADD CATEGORY
         </button>
       </div>
@@ -465,7 +467,7 @@ export function CategoriesAdminPage() {
                   <div className="action-row">
                     <button type="button" className="pill" onClick={() => moveCategory(category.id, -1)}>Up</button>
                     <button type="button" className="pill" onClick={() => moveCategory(category.id, 1)}>Down</button>
-                    <button type="button" className="btn-action danger" onClick={() => setMessage(deleteCategory(category.id))}>Delete</button>
+                    <button type="button" className="btn-action danger" onClick={() => setPendingDeleteCategory(category)}>Delete</button>
                   </div>
                 </td>
               </tr>
@@ -473,6 +475,41 @@ export function CategoriesAdminPage() {
           </tbody>
         </table>
       </div>
+      <AdminTextPromptModal
+        open={addOpen}
+        title="Add category"
+        label="Category name"
+        placeholder="e.g. Skincare"
+        submitLabel="ADD CATEGORY"
+        onClose={() => setAddOpen(false)}
+        onSubmit={(name) => {
+          const error = saveCategory({
+            id: mode === 'production' ? entityUuid() : uid('cat'),
+            name,
+            slug: slugify(name),
+            symbol: '✦',
+            tint: '#faeaf0',
+            imageUrl: null,
+            active: true,
+            sortOrder: categories.length + 1,
+            showOnHomepage: false,
+            showInNav: false,
+            blurb: 'Shop collection →',
+          })
+          setMessage(error)
+        }}
+      />
+      <AdminConfirmModal
+        open={Boolean(pendingDeleteCategory)}
+        title={pendingDeleteCategory ? `Delete ${pendingDeleteCategory.name}?` : 'Delete category?'}
+        description="Move or delete products in this category before removing it."
+        confirmLabel="DELETE"
+        danger
+        onClose={() => setPendingDeleteCategory(null)}
+        onConfirm={() => {
+          if (pendingDeleteCategory) setMessage(deleteCategory(pendingDeleteCategory.id))
+        }}
+      />
     </>
   )
 }
