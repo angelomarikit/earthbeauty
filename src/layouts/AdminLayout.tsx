@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { AdminSidebar, AdminTopbar } from '@/components/admin/AdminChrome'
+import { PageLoading } from '@/components/ui/PageLoading'
 import { useAuth } from '@/features/auth/AuthContext'
+import { useStore } from '@/features/store/StoreContext'
 
 const titles: Record<string, string> = {
   '/admin': 'Overview',
@@ -19,6 +21,7 @@ const titles: Record<string, string> = {
 
 export function AdminLayout() {
   const { user } = useAuth()
+  const { loading, error, mode } = useStore()
   const location = useLocation()
   const [open, setOpen] = useState(false)
   if (!user) return <Navigate to={`/admin/login?next=${encodeURIComponent(location.pathname)}`} replace />
@@ -32,7 +35,16 @@ export function AdminLayout() {
       <div className="admin-main">
         <AdminTopbar title={title} onMenu={() => setOpen(true)} />
         <div className="admin-content">
-          <Outlet />
+          {loading && mode === 'production' ? (
+            <PageLoading message="Loading your dashboard…" admin />
+          ) : error && mode === 'production' ? (
+            <div className="whitepanel form-error" style={{ padding: 20 }}>
+              <b>Could not load store data.</b>
+              <p className="small" style={{ marginTop: 8 }}>{error}</p>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </div>
       </div>
     </div>

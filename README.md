@@ -50,12 +50,8 @@ Run these in order in the Supabase SQL Editor. Do not skip ahead.
 4. `supabase/migrations/0005_brands.sql` — supplier `brands` table, `products.brand_id`, RLS (run before production brand assignments).
 5. *(Optional)* `supabase/migrations/0005_brands_seed.sql` — inserts the 16 client supplier brands (safe to re-run).
 
-6. In Storage, create:
-   - `product-images` (public)
-   - `payment-proofs` (private — customer proof uploads)
-   - `payment-qr` (private recommended — admin QR images for GCash/Maya/QR Ph)
-
-   Then run `supabase/migrations/0006_storage_policies.sql` in the SQL Editor (after buckets exist).
+6. Run **`supabase/migrations/0006_storage_policies.sql`** in the SQL Editor. It creates the Storage buckets (`product-images` public, `payment-proofs` and `payment-qr` private) and RLS policies.  
+   Or create those three buckets manually under **Storage → New bucket**, then run the same SQL file.
 
 7. Create an Auth user for the merchant, then insert an admin role:
 

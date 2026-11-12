@@ -1,6 +1,15 @@
--- Supabase Storage policies for Earth Beauty & Wellness.
--- Create buckets first in Dashboard: product-images (public), payment-proofs (private), payment-qr (private).
--- Then run this file in the SQL Editor.
+-- Supabase Storage buckets + policies for Earth Beauty & Wellness.
+-- Run this entire file in the SQL Editor (creates buckets if missing, then policies).
+-- Or create buckets in Dashboard → Storage first, then run from "-- product-images: public read" onward.
+
+insert into storage.buckets (id, name, public)
+values
+  ('product-images', 'product-images', true),
+  ('payment-proofs', 'payment-proofs', false),
+  ('payment-qr', 'payment-qr', false)
+on conflict (id) do update
+set public = excluded.public;
+
 -- PostgreSQL does not support CREATE POLICY IF NOT EXISTS; policies are dropped and recreated.
 
 -- product-images: public read

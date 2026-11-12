@@ -6,7 +6,7 @@ import { useStore } from '@/features/store/StoreContext'
 import { usePageMeta } from '@/lib/seo'
 
 export function HomePage() {
-  const { state, loading } = useStore()
+  const { state } = useStore()
   usePageMeta('Earth Beauty & Wellness', 'Everyday beauty and wellness essentials from Santa Rosa, Laguna.')
 
   const favorites = state.products.filter((product) => product.active && product.featured).slice(0, 4)
@@ -17,16 +17,6 @@ export function HomePage() {
   function brandMark(name: string) {
     const letter = name.trim().charAt(0)
     return letter ? letter.toUpperCase() : '✦'
-  }
-
-  if (loading) {
-    return (
-      <div className="page">
-        <div className="wrap">
-          <div className="skeleton" style={{ height: 365 }} />
-        </div>
-      </div>
-    )
   }
 
   return (
