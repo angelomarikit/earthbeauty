@@ -272,6 +272,7 @@ const orders: Order[] = [
     notes: 'Demonstration order. Payment has not been collected.',
     trackingNumber: '',
     proofName: null,
+    latestProofId: null,
     history: [
       { at: '2026-11-05T02:10:00.000Z', fulfillment: 'pending', payment: 'pending_verification', note: 'Demonstration order placed.' },
       { at: '2026-11-05T04:00:00.000Z', fulfillment: 'confirmed', payment: 'pending_verification', note: 'Order confirmed for the sample timeline.' },
@@ -302,6 +303,7 @@ const orders: Order[] = [
     notes: 'Demonstration record.',
     trackingNumber: 'DEMO-TRK-1023',
     proofName: null,
+    latestProofId: null,
     history: [
       { at: '2026-11-05T01:00:00.000Z', fulfillment: 'pending', payment: 'unpaid', note: 'Demonstration order placed.' },
       { at: '2026-11-06T01:00:00.000Z', fulfillment: 'delivered', payment: 'paid', note: 'Marked delivered in the sample timeline.' },
@@ -331,6 +333,7 @@ const orders: Order[] = [
     notes: 'Demonstration record. The second line keeps a historical sample price.',
     trackingNumber: 'DEMO-TRK-1022',
     proofName: null,
+    latestProofId: null,
     history: [
       { at: '2026-11-04T06:00:00.000Z', fulfillment: 'pending', payment: 'pending_verification', note: 'Demonstration order placed.' },
       { at: '2026-11-05T06:00:00.000Z', fulfillment: 'shipped', payment: 'pending_verification', note: 'Marked to ship in the sample timeline.' },
@@ -360,6 +363,7 @@ const orders: Order[] = [
     notes: 'Demonstration record.',
     trackingNumber: 'DEMO-TRK-1021',
     proofName: null,
+    latestProofId: null,
     history: [
       { at: '2026-11-04T03:00:00.000Z', fulfillment: 'delivered', payment: 'paid', note: 'Sample delivered order.' },
     ],
@@ -388,6 +392,7 @@ const orders: Order[] = [
     notes: 'Demonstration record.',
     trackingNumber: 'DEMO-TRK-1002',
     proofName: null,
+    latestProofId: null,
     history: [
       { at: '2026-10-28T03:00:00.000Z', fulfillment: 'delivered', payment: 'paid', note: 'Sample delivered order.' },
     ],
@@ -459,6 +464,15 @@ const settings: StoreSettings = {
   gcashInstructions: 'This is a demonstration instruction. Send the exact order total to the store GCash number and upload your receipt. An administrator will verify it manually. No payment is captured in this preview.',
   codEnabled: true,
   gcashEnabled: true,
+  mayaEnabled: false,
+  mayaAccountName: '',
+  mayaNumber: '',
+  mayaInstructions: '',
+  qrphEnabled: false,
+  qrphDisplayName: 'QR Ph',
+  qrphRecipientInfo: '',
+  qrphInstructions: '',
+  xenditEnabled: false,
   showPreviewCatalogueNotice: true,
   paymongoNote: 'PayMongo is not connected. This option stays unavailable until the merchant completes onboarding.',
   policies: {

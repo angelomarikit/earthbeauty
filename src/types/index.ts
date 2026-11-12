@@ -99,8 +99,27 @@ export type FulfillmentStatus =
   | 'delivered'
   | 'cancelled'
 
-export type PaymentStatus = 'unpaid' | 'pending_verification' | 'paid' | 'failed' | 'refunded'
-export type PaymentMethod = 'cod' | 'gcash' | 'paymongo'
+export type PaymentStatus = 'unpaid' | 'pending_verification' | 'paid' | 'failed' | 'refunded' | 'rejected'
+export type PaymentMethod =
+  | 'cod'
+  | 'gcash_manual'
+  | 'maya_manual'
+  | 'qrph_manual'
+  | 'xendit'
+  | 'gcash'
+  | 'paymongo'
+
+export type PaymentProof = {
+  id: string
+  orderId: string
+  storagePath: string
+  fileName: string
+  mimeType: string
+  referenceNumber: string
+  verificationStatus: string
+  attemptNumber: number
+  createdAt: string
+}
 
 export type OrderItem = {
   productId: string
@@ -144,6 +163,7 @@ export type Order = {
   notes: string
   trackingNumber: string
   proofName: string | null
+  latestProofId: string | null
   history: StatusEvent[]
   demo: true
 }
@@ -196,6 +216,15 @@ export type StoreSettings = {
   gcashInstructions: string
   codEnabled: boolean
   gcashEnabled: boolean
+  mayaEnabled: boolean
+  mayaAccountName: string
+  mayaNumber: string
+  mayaInstructions: string
+  qrphEnabled: boolean
+  qrphDisplayName: string
+  qrphRecipientInfo: string
+  qrphInstructions: string
+  xenditEnabled: boolean
   /** Footer notice that products/prices are preview placeholders. */
   showPreviewCatalogueNotice: boolean
   paymongoNote: string

@@ -3,11 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PackArt } from '@/components/product/ProductCard'
 import { brandName, categoryName } from '@/features/catalog/pricing'
 import { useStore } from '@/features/store/StoreContext'
-import { formatPeso, slugify, uid } from '@/lib/format'
+import { entityUuid, formatPeso, slugify, uid } from '@/lib/format'
+import { uploadBrandLogo, uploadCategoryImage, uploadProductImage } from '@/services/storageUpload'
 import type { Brand, Category, PackStyle, Product, Variant } from '@/types'
 
 export function ProductsAdminPage() {
-  const { state, saveProduct, deleteProduct } = useStore()
+  const { state, saveProduct, deleteProduct, mode } = useStore()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
   const [sort, setSort] = useState('name')
@@ -26,7 +27,9 @@ export function ProductsAdminPage() {
         <div>
           <div className="eyebrow">CATALOGUE</div>
           <h1 style={{ font: '31px Georgia, serif' }}>Products</h1>
-          <p className="muted small">Demonstration products. Changes stay in this browser.</p>
+          <p className="muted small">
+            {mode === 'production' ? 'Live catalogue synced with Supabase.' : 'Demonstration products. Changes stay in this browser.'}
+          </p>
         </div>
         <Link className="btn" to="/admin/products/new">＋ ADD NEW PRODUCT</Link>
       </div>
@@ -77,7 +80,7 @@ export function ProductsAdminPage() {
           <button className="drawer-backdrop" aria-label="Close" onClick={() => setPendingDelete(null)} />
           <div className="whitepanel" style={{ position: 'fixed', zIndex: 70, left: '50%', top: '30%', transform: 'translateX(-50%)', width: 420 }}>
             <h3>Delete {pendingDelete.name}?</h3>
-            <p className="muted small">This removes it from the demonstration catalogue in this browser.</p>
+            <p className="muted small">{mode === 'production' ? 'This permanently removes the product from your catalogue.' : 'This removes it from the demonstration catalogue in this browser.'}</p>
             <div className="row" style={{ marginTop: 16 }}>
               <button className="btn" onClick={() => { deleteProduct(pendingDelete.id); setPendingDelete(null) }}>DELETE</button>
               <button className="btn outline" onClick={() => setPendingDelete(null)}>CANCEL</button>
@@ -91,16 +94,18 @@ export function ProductsAdminPage() {
 
 export function ProductFormPage() {
   const { id } = useParams()
-  const { state, saveProduct } = useStore()
+  const { state, saveProduct, mode } = useStore()
   const navigate = useNavigate()
   const existing = state.products.find((product) => product.id === id)
-  const [form, setForm] = useState<Product>(() => existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null))
+  const [form, setForm] = useState<Product>(() => existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null, mode === 'production'))
   useEffect(() => {
-    setForm(existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null))
+    setForm(existing ?? blankProduct(state.categories[0]?.id ?? '', state.brands[0]?.id ?? null, mode === 'production'))
     // Reload the form only when the route changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
   const [error, setError] = useState<string | null>(null)
+  const [pendingImage, setPendingImage] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
 
   function update<K extends keyof Product>(key: K, value: Product[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -110,20 +115,42 @@ export function ProductFormPage() {
     <form
       onSubmit={(event) => {
         event.preventDefault()
-        if (!form.name.trim()) return setError('Enter a product name.')
-        if (!form.categoryId) return setError('Choose a category.')
-        if (!form.brandId) return setError('Choose a brand.')
-        const slug = slugify(form.slug || form.name)
-        if (state.products.some((product) => product.slug === slug && product.id !== form.id)) return setError('That link is already used.')
-        const variants = form.variants.map((variant) => ({ ...variant, stock: Math.max(0, variant.stock), priceCentavos: Math.max(0, variant.priceCentavos) }))
-        const stock = variants.reduce((sum, variant) => sum + variant.stock, 0)
-        saveProduct({ ...form, slug, variants, stock, priceCentavos: variants[0]?.priceCentavos ?? form.priceCentavos, demo: true })
-        navigate('/admin/products')
+        void (async () => {
+          if (!form.name.trim()) return setError('Enter a product name.')
+          if (!form.categoryId) return setError('Choose a category.')
+          if (!form.brandId) return setError('Choose a brand.')
+          const slug = slugify(form.slug || form.name)
+          if (state.products.some((product) => product.slug === slug && product.id !== form.id)) return setError('That link is already used.')
+          const variants = form.variants.map((variant) => ({ ...variant, stock: Math.max(0, variant.stock), priceCentavos: Math.max(0, variant.priceCentavos) }))
+          const stock = variants.reduce((sum, variant) => sum + variant.stock, 0)
+          setSaving(true)
+          setError(null)
+          try {
+            let imageUrl = form.imageUrl
+            if (mode === 'production' && pendingImage) {
+              imageUrl = await uploadProductImage(pendingImage, form.id)
+            }
+            saveProduct({
+              ...form,
+              slug,
+              variants,
+              stock,
+              imageUrl,
+              priceCentavos: variants[0]?.priceCentavos ?? form.priceCentavos,
+              demo: true,
+            })
+            navigate('/admin/products')
+          } catch (reason: unknown) {
+            setError(reason instanceof Error ? reason.message : 'Could not save the product.')
+          } finally {
+            setSaving(false)
+          }
+        })()
       }}
     >
       <div className="between" style={{ marginBottom: 18 }}>
         <h1 style={{ font: '31px Georgia, serif' }}>{existing ? 'Edit product' : 'Add product'}</h1>
-        <button className="btn" type="submit">SAVE PRODUCT</button>
+        <button className="btn" type="submit" disabled={saving}>{saving ? 'SAVING…' : 'SAVE PRODUCT'}</button>
       </div>
       {error ? <div className="notice">{error}</div> : null}
       <div className="grid2">
@@ -165,6 +192,11 @@ export function ProductFormPage() {
               onChange={(event) => {
                 const file = event.target.files?.[0]
                 if (!file) return
+                if (mode === 'production') {
+                  setPendingImage(file)
+                  update('imageUrl', URL.createObjectURL(file))
+                  return
+                }
                 if (file.size > 400_000) {
                   setError('Choose an image under 400 KB for this browser preview.')
                   return
@@ -211,8 +243,8 @@ function blankVariant(product: Product): Variant {
   return { id: uid('var'), label: 'New size', sku: `${product.sku}-NEW`, priceCentavos: product.priceCentavos, compareAtCentavos: product.compareAtCentavos, stock: 0, active: true }
 }
 
-function blankProduct(categoryId: string, brandId: string | null): Product {
-  const id = uid('p')
+function blankProduct(categoryId: string, brandId: string | null, production = false): Product {
+  const id = production ? entityUuid() : uid('p')
   return {
     id,
     name: '',
@@ -248,7 +280,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function BrandsAdminPage() {
-  const { state, saveBrand, deleteBrand, moveBrand } = useStore()
+  const { state, saveBrand, deleteBrand, moveBrand, mode } = useStore()
   const [message, setMessage] = useState<string | null>(null)
   const brands = [...state.brands].sort((a, b) => a.sortOrder - b.sortOrder)
 
@@ -270,7 +302,7 @@ export function BrandsAdminPage() {
             const name = window.prompt('Brand name')
             if (!name) return
             const error = saveBrand({
-              id: uid('brand'),
+              id: mode === 'production' ? entityUuid() : uid('brand'),
               name,
               slug: slugify(name),
               logoUrl: null,
@@ -302,13 +334,24 @@ export function BrandsAdminPage() {
                     <input type="file" accept="image/*" hidden onChange={(event) => {
                       const file = event.target.files?.[0]
                       if (!file) return
-                      if (file.size > 400_000) {
-                        setMessage('Choose a logo under 400 KB for this browser preview.')
-                        return
-                      }
-                      const reader = new FileReader()
-                      reader.onload = () => edit(brand, { logoUrl: String(reader.result) })
-                      reader.readAsDataURL(file)
+                      void (async () => {
+                        try {
+                          if (mode === 'production') {
+                            const url = await uploadBrandLogo(file, brand.id)
+                            edit(brand, { logoUrl: url })
+                          } else {
+                            if (file.size > 400_000) {
+                              setMessage('Choose a logo under 400 KB for this browser preview.')
+                              return
+                            }
+                            const reader = new FileReader()
+                            reader.onload = () => edit(brand, { logoUrl: String(reader.result) })
+                            reader.readAsDataURL(file)
+                          }
+                        } catch (reason: unknown) {
+                          setMessage(reason instanceof Error ? reason.message : 'Upload failed.')
+                        }
+                      })()
                       event.target.value = ''
                     }} />
                   </label>
@@ -340,7 +383,7 @@ export function BrandsAdminPage() {
 }
 
 export function CategoriesAdminPage() {
-  const { state, saveCategory, deleteCategory, moveCategory } = useStore()
+  const { state, saveCategory, deleteCategory, moveCategory, mode } = useStore()
   const [message, setMessage] = useState<string | null>(null)
   const categories = [...state.categories].sort((a, b) => a.sortOrder - b.sortOrder)
 
@@ -362,7 +405,7 @@ export function CategoriesAdminPage() {
             const name = window.prompt('Category name')
             if (!name) return
             const error = saveCategory({
-              id: uid('cat'),
+              id: mode === 'production' ? entityUuid() : uid('cat'),
               name,
               slug: slugify(name),
               symbol: '✦',
@@ -391,10 +434,21 @@ export function CategoriesAdminPage() {
                   <input className="field-input" value={category.name} onChange={(event) => edit(category, { name: event.target.value, slug: slugify(event.target.value) })} />
                   <input className="field-input" style={{ marginTop: 8 }} type="file" accept="image/*" onChange={(event) => {
                     const file = event.target.files?.[0]
-                    if (!file || file.size > 400_000) return
-                    const reader = new FileReader()
-                    reader.onload = () => edit(category, { imageUrl: String(reader.result) })
-                    reader.readAsDataURL(file)
+                    if (!file) return
+                    void (async () => {
+                      try {
+                        if (mode === 'production') {
+                          const url = await uploadCategoryImage(file, category.id)
+                          edit(category, { imageUrl: url })
+                        } else if (file.size <= 400_000) {
+                          const reader = new FileReader()
+                          reader.onload = () => edit(category, { imageUrl: String(reader.result) })
+                          reader.readAsDataURL(file)
+                        }
+                      } catch (reason: unknown) {
+                        setMessage(reason instanceof Error ? reason.message : 'Upload failed.')
+                      }
+                    })()
                   }} />
                 </td>
                 <td><input type="checkbox" checked={category.showOnHomepage} onChange={(event) => edit(category, { showOnHomepage: event.target.checked })} /></td>

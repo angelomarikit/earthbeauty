@@ -1,16 +1,20 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, XAxis } from 'recharts'
 import { sampleSales } from '@/data/demo/dashboard'
+import { lastSevenDaySales, paidOrders } from '@/features/admin/dashboardMetrics'
 import { useStore } from '@/features/store/StoreContext'
+import { productionFetchOrderProofs, productionMarkCodCollected, productionVerifyPayment } from '@/services/productionStore'
+import { signedProofUrl } from '@/services/storageUpload'
 import { formatDate, formatPeso, fulfillmentClass, fulfillmentLabel, paymentClass, paymentLabel, uid } from '@/lib/format'
-import type { Banner, Coupon, FulfillmentStatus, PaymentStatus, StoreSettings } from '@/types'
+import { paymentMethodLabel } from '@/lib/paymentMethods'
+import type { Banner, Coupon, FulfillmentStatus, PaymentProof, PaymentStatus, StoreSettings } from '@/types'
 
 const fulfillmentOptions: FulfillmentStatus[] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
 const paymentOptions: PaymentStatus[] = ['unpaid', 'pending_verification', 'paid', 'failed', 'refunded']
 
 export function OrdersAdminPage() {
-  const { state } = useStore()
+  const { state, mode } = useStore()
   const [params, setParams] = useSearchParams()
   const q = (params.get('q') ?? '').toLowerCase()
   const status = params.get('status') ?? 'all'
@@ -24,7 +28,11 @@ export function OrdersAdminPage() {
     <>
       <div className="eyebrow">ORDERS</div>
       <h1 style={{ font: '31px Georgia, serif' }}>Orders</h1>
-      <p className="muted small">Payment status stays separate from fulfillment. These are demonstration records.</p>
+      <p className="muted small">
+        {mode === 'production'
+          ? 'Payment verification and fulfillment are tracked separately.'
+          : 'Payment status stays separate from fulfillment. These are demonstration records.'}
+      </p>
       <div className="row" style={{ margin: '16px 0' }}>
         <input className="field-input" style={{ maxWidth: 280 }} placeholder="Search orders" value={params.get('q') ?? ''} onChange={(event) => {
           const next = new URLSearchParams(params)
@@ -66,16 +74,72 @@ export function OrdersAdminPage() {
 
 export function OrderAdminDetailPage() {
   const { id } = useParams()
-  const { state, updateOrder } = useStore()
+  const { state, updateOrder, mode, refreshState } = useStore()
   const order = state.orders.find((entry) => entry.id === id)
   const [tracking, setTracking] = useState(order?.trackingNumber ?? '')
   const [notes, setNotes] = useState(order?.notes ?? '')
+  const [proofs, setProofs] = useState<PaymentProof[]>([])
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    setTracking(order?.trackingNumber ?? '')
+    setNotes(order?.notes ?? '')
+  }, [order?.id, order?.notes, order?.trackingNumber])
+
+  useEffect(() => {
+    if (!order || mode !== 'production') return
+    let cancelled = false
+    void productionFetchOrderProofs(order.id).then(async (rows) => {
+      if (cancelled) return
+      setProofs(rows)
+      const latest = rows[0]
+      if (latest?.storagePath) {
+        const url = await signedProofUrl(latest.storagePath)
+        if (!cancelled) setPreviewUrl(url)
+      } else {
+        setPreviewUrl(null)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, order])
+
+  async function runPaymentAction(action: 'approve' | 'reject' | 'cod') {
+    if (!order) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      if (action === 'cod') {
+        await productionMarkCodCollected(order.id)
+      } else {
+        const proof = proofs[0]
+        if (!proof) throw new Error('No payment proof on file.')
+        await productionVerifyPayment({
+          orderId: order.id,
+          proofId: proof.id,
+          decision: action === 'approve' ? 'approve' : 'reject',
+          adminNotes: action === 'approve' ? 'Payment approved.' : 'Payment rejected.',
+        })
+      }
+      await refreshState()
+    } catch (reason: unknown) {
+      setActionError(reason instanceof Error ? reason.message : 'Action failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!order) return <div className="whitepanel">Order not found.</div>
   return (
     <>
       <div className="eyebrow">ORDER</div>
       <h1 style={{ font: '31px Georgia, serif' }}>#{order.orderNumber}</h1>
-      <div className="notice">Demonstration order. Do not treat the payment state as money received by the business.</div>
+      {mode === 'demo' ? (
+        <div className="notice">Demonstration order. Do not treat the payment state as money received by the business.</div>
+      ) : null}
       <div className="grid2">
         <div className="whitepanel">
           <h3>Customer</h3>
@@ -89,17 +153,50 @@ export function OrderAdminDetailPage() {
             </div>
           ))}
           <div className="between"><span>Total</span><b>{formatPeso(order.totalCentavos)}</b></div>
-          {order.proofName ? <p className="small">Proof file name: {order.proofName}</p> : <p className="muted small">No proof of payment attached.</p>}
+          <p className="small" style={{ marginTop: 8 }}>
+            Payment method: <b>{paymentMethodLabel(order.paymentMethod)}</b> ·{' '}
+            <span className={paymentClass(order.paymentStatus)}>{paymentLabel(order.paymentStatus)}</span>
+          </p>
+          {mode === 'production' && proofs.length ? (
+            <div style={{ marginTop: 12 }}>
+              <p className="small">Latest proof: {proofs[0].fileName} · ref {proofs[0].referenceNumber || '—'}</p>
+              {previewUrl ? <img src={previewUrl} alt="Payment proof" style={{ maxWidth: '100%', marginTop: 8, borderRadius: 8 }} /> : null}
+            </div>
+          ) : order.proofName ? (
+            <p className="small">Proof file name: {order.proofName}</p>
+          ) : (
+            <p className="muted small">No proof of payment attached.</p>
+          )}
         </div>
         <div className="whitepanel">
+          {actionError ? <div className="form-error" style={{ marginBottom: 12 }}>{actionError}</div> : null}
+          {mode === 'production' && order.paymentMethod !== 'cod' && order.paymentStatus === 'pending_verification' && proofs.length ? (
+            <div className="row" style={{ marginBottom: 16, gap: 8 }}>
+              <button type="button" className="btn" disabled={busy} onClick={() => void runPaymentAction('approve')}>APPROVE PAYMENT</button>
+              <button type="button" className="btn outline" disabled={busy} onClick={() => void runPaymentAction('reject')}>REJECT</button>
+            </div>
+          ) : null}
+          {mode === 'production' && order.paymentMethod === 'cod' && order.paymentStatus !== 'paid' ? (
+            <button type="button" className="btn" style={{ marginBottom: 16 }} disabled={busy} onClick={() => void runPaymentAction('cod')}>
+              MARK COD COLLECTED
+            </button>
+          ) : null}
           <label className="fieldlabel">Fulfillment</label>
           <select className="field-input" value={order.fulfillmentStatus} onChange={(event) => updateOrder(order.id, { fulfillmentStatus: event.target.value as FulfillmentStatus, historyNote: 'Fulfillment updated.' })}>
             {fulfillmentOptions.map((option) => <option key={option} value={option}>{fulfillmentLabel(option)}</option>)}
           </select>
-          <label className="fieldlabel" style={{ marginTop: 14 }}>Payment status</label>
-          <select className="field-input" value={order.paymentStatus} onChange={(event) => updateOrder(order.id, { paymentStatus: event.target.value as PaymentStatus, historyNote: 'Payment status updated by an administrator.' })}>
-            {paymentOptions.map((option) => <option key={option} value={option}>{paymentLabel(option)}</option>)}
-          </select>
+          {mode === 'demo' ? (
+            <>
+              <label className="fieldlabel" style={{ marginTop: 14 }}>Payment status</label>
+              <select className="field-input" value={order.paymentStatus} onChange={(event) => updateOrder(order.id, { paymentStatus: event.target.value as PaymentStatus, historyNote: 'Payment status updated by an administrator.' })}>
+                {paymentOptions.map((option) => <option key={option} value={option}>{paymentLabel(option)}</option>)}
+              </select>
+            </>
+          ) : (
+            <p className="muted small" style={{ marginTop: 14 }}>
+              Payment status is updated via proof verification or COD collection, not manual edits.
+            </p>
+          )}
           <label className="fieldlabel" style={{ marginTop: 14 }}>Tracking number</label>
           <input className="field-input" value={tracking} onChange={(event) => setTracking(event.target.value)} />
           <label className="fieldlabel" style={{ marginTop: 14 }}>Order notes</label>
@@ -206,10 +303,15 @@ function blankCoupon(): Coupon {
 }
 
 export function ReportsAdminPage() {
-  const { state } = useStore()
+  const { state, mode } = useStore()
   const [from, setFrom] = useState('2026-10-01')
   const [to, setTo] = useState('2026-11-30')
   const orders = state.orders.filter((order) => order.createdAt.slice(0, 10) >= from && order.createdAt.slice(0, 10) <= to)
+  const paidInRange = paidOrders(orders)
+  const chartData =
+    mode === 'production'
+      ? lastSevenDaySales(state.orders).map((point) => ({ day: point.day, amount: point.amount, bar: Number.parseInt(point.bar, 10) || 0 }))
+      : sampleSales
   const byStatus = fulfillmentOptions.map((status) => ({ status, count: orders.filter((order) => order.fulfillmentStatus === status).length }))
   function exportCsv() {
     const header = 'order,date,customer,total_centavos,payment,fulfillment,demo'
@@ -218,7 +320,7 @@ export function ReportsAdminPage() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'earth-beauty-demo-orders.csv'
+    link.download = mode === 'production' ? 'earth-beauty-orders.csv' : 'earth-beauty-demo-orders.csv'
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -231,17 +333,19 @@ export function ReportsAdminPage() {
         </div>
         <button className="btn outline" onClick={exportCsv}>EXPORT CSV</button>
       </div>
-      <div className="notice">These rows are fictional demonstration orders. They are not Earth Beauty & Wellness revenue.</div>
+      {mode === 'demo' ? (
+        <div className="notice">These rows are fictional demonstration orders. They are not Earth Beauty & Wellness revenue.</div>
+      ) : null}
       <div className="row">
         <input className="field-input" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
         <input className="field-input" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
       </div>
       <div className="grid2" style={{ marginTop: 16 }}>
         <div className="whitepanel">
-          <h3>Sample weekly shape</h3>
+          <h3>{mode === 'production' ? 'Paid revenue (last 7 days)' : 'Sample weekly shape'}</h3>
           <div style={{ height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sampleSales}>
+              <BarChart data={chartData}>
                 <XAxis dataKey="day" tickLine={false} axisLine={false} />
                 <Bar dataKey="amount" fill="#F20A87" radius={[5, 5, 0, 0]} />
               </BarChart>
@@ -252,7 +356,10 @@ export function ReportsAdminPage() {
           <h3>Orders by status in range</h3>
           {byStatus.map((row) => <div key={row.status} className="between" style={{ padding: '8px 0' }}><span>{fulfillmentLabel(row.status)}</span><b>{row.count}</b></div>)}
           <div className="line" />
-          <div className="between"><span>Preview total</span><b>{formatPeso(orders.reduce((sum, order) => sum + order.totalCentavos, 0))}</b></div>
+          <div className="between">
+            <span>{mode === 'production' ? 'Paid total in range' : 'Preview total'}</span>
+            <b>{formatPeso((mode === 'production' ? paidInRange : orders).reduce((sum, order) => sum + order.totalCentavos, 0))}</b>
+          </div>
         </div>
       </div>
       <div className="whitepanel" style={{ marginTop: 16 }}>
@@ -266,6 +373,9 @@ export function ReportsAdminPage() {
 export function SettingsAdminPage() {
   const { state, saveSettings, saveShipping, resetDemo, mode } = useStore()
   const [form, setForm] = useState<StoreSettings>(state.settings)
+  useEffect(() => {
+    setForm(state.settings)
+  }, [state.settings])
   function set<K extends keyof StoreSettings>(key: K, value: StoreSettings[K]) {
     setForm((current) => ({ ...current, [key]: value }))
   }
@@ -310,6 +420,15 @@ export function SettingsAdminPage() {
             <Field label="GCash instructions"><textarea className="field-input" value={form.gcashInstructions} onChange={(event) => set('gcashInstructions', event.target.value)} /></Field>
             <label className="checkline"><input type="checkbox" checked={form.codEnabled} onChange={(event) => set('codEnabled', event.target.checked)} /> Cash on delivery available</label>
             <label className="checkline"><input type="checkbox" checked={form.gcashEnabled} onChange={(event) => set('gcashEnabled', event.target.checked)} /> GCash instructions available</label>
+            <label className="checkline"><input type="checkbox" checked={form.mayaEnabled} onChange={(event) => set('mayaEnabled', event.target.checked)} /> Maya manual payments</label>
+            <Field label="Maya account name"><input className="field-input" value={form.mayaAccountName} onChange={(event) => set('mayaAccountName', event.target.value)} /></Field>
+            <Field label="Maya number"><input className="field-input" value={form.mayaNumber} onChange={(event) => set('mayaNumber', event.target.value)} /></Field>
+            <Field label="Maya instructions"><textarea className="field-input" value={form.mayaInstructions} onChange={(event) => set('mayaInstructions', event.target.value)} /></Field>
+            <label className="checkline"><input type="checkbox" checked={form.qrphEnabled} onChange={(event) => set('qrphEnabled', event.target.checked)} /> QR Ph manual payments</label>
+            <Field label="QR Ph label"><input className="field-input" value={form.qrphDisplayName} onChange={(event) => set('qrphDisplayName', event.target.value)} /></Field>
+            <Field label="QR Ph recipient info"><textarea className="field-input" value={form.qrphRecipientInfo} onChange={(event) => set('qrphRecipientInfo', event.target.value)} /></Field>
+            <Field label="QR Ph instructions"><textarea className="field-input" value={form.qrphInstructions} onChange={(event) => set('qrphInstructions', event.target.value)} /></Field>
+            <label className="checkline"><input type="checkbox" checked={form.xenditEnabled} onChange={(event) => set('xenditEnabled', event.target.checked)} /> Xendit online checkout (requires Edge Function secrets)</label>
             <Field label="Low stock threshold"><input className="field-input" type="number" min={0} value={form.lowStockThreshold} onChange={(event) => set('lowStockThreshold', Number(event.target.value))} /></Field>
           </div>
         </div>

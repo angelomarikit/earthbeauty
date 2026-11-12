@@ -52,6 +52,7 @@ export function fulfillmentClass(status: string) {
 export function paymentLabel(status: string) {
   if (status === 'pending_verification') return 'Pending verification'
   if (status === 'paid') return 'Paid'
+  if (status === 'rejected') return 'Rejected'
   if (status === 'failed') return 'Failed'
   if (status === 'refunded') return 'Refunded'
   return 'Unpaid'
@@ -66,4 +67,9 @@ export function paymentClass(status: string) {
 
 export function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`
+}
+
+export function entityUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return uid('id')
 }

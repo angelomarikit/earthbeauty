@@ -12,6 +12,8 @@ import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { regions } from '@/data/demo/locations'
 import { formatPeso } from '@/lib/format'
+import { manualMethodsRequireProof, paymentMethodLabel } from '@/lib/paymentMethods'
+import type { PaymentMethod } from '@/types'
 import { usePageMeta } from '@/lib/seo'
 
 const schema = z.object({
@@ -27,22 +29,36 @@ const schema = z.object({
   postalCode: z.string().min(4, 'Enter a postal code'),
   notes: z.string().optional(),
   shippingMethodId: z.string().min(1),
-  payment: z.enum(['cod', 'gcash']),
+  payment: z.string().min(1),
   voucher: z.string().optional(),
+  referenceNumber: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
 
 export function CheckoutPage() {
-  const { state, placeOrder } = useStore()
+  const { state, placeOrder, mode } = useStore()
   const { lines, clear } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [proofName, setProofName] = useState<string | null>(null)
+  const [proofFile, setProofFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const detailed = cartDetailed(state, lines).filter((line) => line.quantity > 0)
   const subtotal = detailed.reduce((sum, line) => sum + line.lineCentavos, 0)
-  usePageMeta('Checkout · Earth Beauty & Wellness', 'Demonstration checkout. No real payment is captured.')
+  usePageMeta(
+    'Checkout · Earth Beauty & Wellness',
+    mode === 'production' ? 'Complete your order and payment.' : 'Demonstration checkout. No real payment is captured.',
+  )
+
+  const defaultPayment = useMemo((): PaymentMethod => {
+    if (state.settings.gcashEnabled) return 'gcash_manual'
+    if (state.settings.codEnabled) return 'cod'
+    if (state.settings.mayaEnabled) return 'maya_manual'
+    if (state.settings.qrphEnabled) return 'qrph_manual'
+    if (state.settings.xenditEnabled) return 'xendit'
+    return 'cod'
+  }, [state.settings])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -59,8 +75,9 @@ export function CheckoutPage() {
       postalCode: '',
       notes: '',
       shippingMethodId: state.shippingMethods.find((method) => method.active)?.id ?? '',
-      payment: state.settings.gcashEnabled ? 'gcash' : 'cod',
+      payment: defaultPayment,
       voucher: sessionStorage.getItem('ebw-voucher') ?? '',
+      referenceNumber: '',
     },
   })
 
@@ -69,7 +86,7 @@ export function CheckoutPage() {
   const cityName = form.watch('city')
   const shippingMethodId = form.watch('shippingMethodId')
   const voucher = form.watch('voucher')
-  const payment = form.watch('payment')
+  const payment = form.watch('payment') as PaymentMethod
   const region = regions.find((entry) => entry.name === regionName)
   const province = region?.provinces.find((entry) => entry.name === provinceName)
   const city = province?.cities.find((entry) => entry.name === cityName)
@@ -79,13 +96,20 @@ export function CheckoutPage() {
   const shipping = method?.feeCentavos ?? 0
   const total = Math.max(0, subtotal - discount + shipping)
   const methods = useMemo(() => state.shippingMethods.filter((entry) => entry.active), [state.shippingMethods])
+  const needsProof = manualMethodsRequireProof(payment)
 
-  const onSubmit = form.handleSubmit((values) => {
+  const onSubmit = form.handleSubmit(async (values) => {
     if (!detailed.length) {
       setFormError('Your cart is empty.')
       return
     }
-    const result = placeOrder({
+    if (mode === 'production' && !user) {
+      setFormError('Sign in to place an order.')
+      return
+    }
+    setSubmitting(true)
+    setFormError(null)
+    const result = await placeOrder({
       customerId: user?.id ?? null,
       customerName: `${values.firstName} ${values.lastName}`.trim(),
       email: values.email,
@@ -106,10 +130,13 @@ export function CheckoutPage() {
       lines: detailed.map((line) => ({ productId: line.productId, variantId: line.variant?.id ?? line.variantId, quantity: line.quantity })),
       couponCode: values.voucher?.trim() || null,
       shippingMethodId: values.shippingMethodId,
-      paymentMethod: values.payment,
+      paymentMethod: values.payment as PaymentMethod,
       notes: values.notes ?? '',
-      proofName,
+      proofName: proofFile?.name ?? null,
+      proofFile,
+      referenceNumber: values.referenceNumber,
     })
+    setSubmitting(false)
     if (typeof result === 'string') {
       setFormError(result)
       return
@@ -134,7 +161,14 @@ export function CheckoutPage() {
           <i>—</i>
           <span>3　Order Confirmation</span>
         </div>
-        <div className="notice">Demonstration checkout. Cash on delivery and GCash are simulated. No payment is processed and no order is sent to the store.</div>
+        {mode === 'demo' ? (
+          <div className="notice">Demonstration checkout. Cash on delivery and manual e-wallet payments are simulated. No payment is processed.</div>
+        ) : !user ? (
+          <div className="notice">
+            Sign in before checkout so your order and payment proof are linked to your account.{' '}
+            <Link to="/login?next=/checkout" style={{ fontWeight: 700 }}>Sign in</Link>
+          </div>
+        ) : null}
         {!detailed.length ? (
           <div className="whitepanel empty">
             <p>Your cart is empty.</p>
@@ -194,7 +228,7 @@ export function CheckoutPage() {
                   <input className="field-input" style={{ width: '50%' }} {...form.register('postalCode')} />
                 </Field>
                 <Field label="Delivery notes">
-                  <textarea className="field-input" {...form.register('notes')} placeholder="Optional note for the demonstration order" />
+                  <textarea className="field-input" {...form.register('notes')} placeholder="Optional note for delivery" />
                 </Field>
                 <div className="form-group">
                   <div className="fieldlabel">Delivery method</div>
@@ -210,26 +244,54 @@ export function CheckoutPage() {
               <div className="whitepanel" style={{ marginTop: 20 }}>
                 <h2 style={{ font: '24px Georgia, serif', margin: '0 0 22px' }}>Payment Method</h2>
                 {state.settings.gcashEnabled ? (
-                  <label className={`pay-option ${payment === 'gcash' ? 'on' : ''}`}>
-                    <input type="radio" value="gcash" {...form.register('payment')} /> <b>GCash / Manual E-Wallet Payment</b>
-                    <p className="muted small">Simulated. {state.settings.gcashInstructions}</p>
-                    {payment === 'gcash' ? (
-                      <div style={{ marginTop: 10 }}>
-                        <div className="small">Send the order total to {state.settings.gcashNumber} ({state.settings.gcashAccountName}), then attach a receipt name for the preview.</div>
-                        <input className="field-input" style={{ marginTop: 8 }} type="file" accept="image/*,.pdf" onChange={(event) => setProofName(event.target.files?.[0]?.name ?? null)} />
-                      </div>
-                    ) : null}
+                  <label className={`pay-option ${payment === 'gcash_manual' ? 'on' : ''}`}>
+                    <input type="radio" value="gcash_manual" {...form.register('payment')} /> <b>{paymentMethodLabel('gcash_manual')}</b>
+                    <p className="muted small">{state.settings.gcashInstructions}</p>
+                  </label>
+                ) : null}
+                {state.settings.mayaEnabled ? (
+                  <label className={`pay-option ${payment === 'maya_manual' ? 'on' : ''}`} style={{ marginTop: 12 }}>
+                    <input type="radio" value="maya_manual" {...form.register('payment')} /> <b>{paymentMethodLabel('maya_manual')}</b>
+                    <p className="muted small">{state.settings.mayaInstructions || `Send payment to ${state.settings.mayaNumber} (${state.settings.mayaAccountName}).`}</p>
+                  </label>
+                ) : null}
+                {state.settings.qrphEnabled ? (
+                  <label className={`pay-option ${payment === 'qrph_manual' ? 'on' : ''}`} style={{ marginTop: 12 }}>
+                    <input type="radio" value="qrph_manual" {...form.register('payment')} /> <b>{state.settings.qrphDisplayName || paymentMethodLabel('qrph_manual')}</b>
+                    <p className="muted small">{state.settings.qrphInstructions || state.settings.qrphRecipientInfo}</p>
                   </label>
                 ) : null}
                 {state.settings.codEnabled ? (
-                  <label className={`pay-option ${payment === 'cod' ? 'on' : ''}`}>
-                    <input type="radio" value="cod" {...form.register('payment')} /> <b>Cash on Delivery</b> <span className="muted small">(simulated, where available)</span>
+                  <label className={`pay-option ${payment === 'cod' ? 'on' : ''}`} style={{ marginTop: 12 }}>
+                    <input type="radio" value="cod" {...form.register('payment')} /> <b>Cash on Delivery</b>
+                    <p className="muted small">Pay when your order arrives.</p>
                   </label>
                 ) : null}
-                <div className="pay-option" style={{ marginTop: 12, opacity: 0.7 }}>
-                  <b>PayMongo</b>
-                  <p className="muted small">{state.settings.paymongoNote}</p>
-                </div>
+                {state.settings.xenditEnabled ? (
+                  <label className={`pay-option ${payment === 'xendit' ? 'on' : ''}`} style={{ marginTop: 12 }}>
+                    <input type="radio" value="xendit" {...form.register('payment')} /> <b>Pay online (Xendit)</b>
+                    <p className="muted small">You will be redirected to a secure payment page after placing the order.</p>
+                  </label>
+                ) : null}
+                {needsProof ? (
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                    <p className="small" style={{ marginBottom: 8 }}>
+                      Send <b>{formatPeso(total)}</b> using {paymentMethodLabel(payment)}, then upload your receipt.
+                      {payment === 'gcash_manual' ? ` GCash: ${state.settings.gcashNumber} (${state.settings.gcashAccountName}).` : null}
+                    </p>
+                    <Field label="Payment reference number *">
+                      <input className="field-input" {...form.register('referenceNumber')} placeholder="Reference or transaction number" />
+                    </Field>
+                    <Field label="Proof of payment *">
+                      <input
+                        className="field-input"
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(event) => setProofFile(event.target.files?.[0] ?? null)}
+                      />
+                    </Field>
+                  </div>
+                ) : null}
               </div>
             </div>
             <aside className="whitepanel">
@@ -253,11 +315,13 @@ export function CheckoutPage() {
               <div className="between small" style={{ marginTop: 16 }}><span>Shipping</span><b>{formatPeso(shipping)}</b></div>
               <div className="line" />
               <div className="between"><b>Order Total</b><b className="price" style={{ fontSize: 24 }}>{formatPeso(total)}</b></div>
-              <p className="muted tiny">Totals are calculated from the catalogue, delivery method, and voucher in this preview.</p>
+              <p className="muted tiny">Totals use catalog prices, delivery, and any voucher applied at checkout.</p>
               {formError ? <p className="form-error">{formError}</p> : null}
-              <button className="btn wide" style={{ marginTop: 25 }} type="submit">PLACE ORDER →</button>
+              <button className="btn wide" style={{ marginTop: 25 }} type="submit" disabled={submitting || (mode === 'production' && !user)}>
+                {submitting ? 'PLACING ORDER…' : 'PLACE ORDER →'}
+              </button>
               <p className="muted tiny" style={{ lineHeight: 1.7, textAlign: 'center' }}>
-                By placing this demonstration order you agree to the draft <Link to="/policies/terms">Terms</Link> and <Link to="/policies/privacy">Privacy Policy</Link>.
+                By placing this order you agree to the <Link to="/policies/terms">Terms</Link> and <Link to="/policies/privacy">Privacy Policy</Link>.
               </p>
             </aside>
           </form>

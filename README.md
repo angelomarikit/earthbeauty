@@ -55,6 +55,8 @@ Run these in order in the Supabase SQL Editor. Do not skip ahead.
    - `payment-proofs` (private — customer proof uploads)
    - `payment-qr` (private recommended — admin QR images for GCash/Maya/QR Ph)
 
+   Then run `supabase/migrations/0006_storage_policies.sql` in the SQL Editor (after buckets exist).
+
 7. Create an Auth user for the merchant, then insert an admin role:
 
 ```sql

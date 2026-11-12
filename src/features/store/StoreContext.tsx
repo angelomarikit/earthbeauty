@@ -17,14 +17,27 @@ export type PlaceOrderInput = {
   paymentMethod: PaymentMethod
   notes: string
   proofName: string | null
+  proofFile?: File | null
+  referenceNumber?: string
 }
-import { loadProductionState, productionAdjustStock, productionPlaceOrder, productionSave } from '@/services/productionStore'
+import { manualMethodsRequireProof } from '@/lib/paymentMethods'
+import {
+  loadProductionState,
+  productionAdjustStock,
+  productionFetchOrderById,
+  productionPlaceOrder,
+  productionSave,
+  productionSubmitPaymentProof,
+} from '@/services/productionStore'
+import { uploadPaymentProof } from '@/services/storageUpload'
+import { xenditPaymentProvider } from '@/services/payments/xenditPaymentService'
 
 type StoreValue = {
   state: DemoState
   mode: 'demo' | 'production'
   loading: boolean
   error: string | null
+  refreshState: () => Promise<void>
   resetDemo: () => void
   saveProduct: (product: Product) => void
   deleteProduct: (id: string) => void
@@ -36,7 +49,7 @@ type StoreValue = {
   moveBrand: (id: string, direction: -1 | 1) => void
   adjustStock: (productId: string, variantId: string | null, delta: number, reason: string) => string | null
   updateOrder: (orderId: string, patch: Partial<Order> & { historyNote?: string }) => void
-  placeOrder: (input: PlaceOrderInput) => Order | string
+  placeOrder: (input: PlaceOrderInput) => Promise<Order | string>
   saveSettings: (settings: StoreSettings) => void
   saveBanner: (banner: Banner) => void
   deleteBanner: (id: string) => void
@@ -79,16 +92,20 @@ function loadDemo(): DemoState {
 function emptyProduction(): DemoState {
   const seed = buildSeed()
   return {
-    ...seed,
-    products: [],
+    seedVersion: 1,
+    nextOrderSeq: 1,
     categories: [],
     brands: [],
+    products: [],
     orders: [],
-    users: seed.users.filter((user) => user.role === 'admin'),
-    banners: [],
+    settings: { ...seed.settings, showPreviewCatalogueNotice: false },
+    shippingMethods: [],
     coupons: [],
+    banners: [],
+    users: [],
     movements: [],
     audit: [],
+    newsletter: [],
   }
 }
 
@@ -132,6 +149,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       mode,
       loading,
       error,
+      refreshState: async () => {
+        if (mode !== 'production') return
+        setLoading(true)
+        try {
+          const next = await loadProductionState(state.settings)
+          setState(next)
+          setError(null)
+        } catch (reason: unknown) {
+          setError(reason instanceof Error ? reason.message : 'Unable to reload the store.')
+        } finally {
+          setLoading(false)
+        }
+      },
       resetDemo: () => {
         if (mode !== 'demo') return
         localStorage.removeItem(SEED_KEY)
@@ -301,7 +331,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }))
         if (mode === 'production') void productionSave('order', { orderId, patch })
       },
-      placeOrder: (input) => {
+      placeOrder: async (input) => {
         if (!input.lines.length) return 'Your cart is empty.'
         const built: Order['items'] = []
         for (const line of input.lines) {
@@ -328,12 +358,84 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const method = state.shippingMethods.find((entry) => entry.id === input.shippingMethodId && entry.active)
         if (!method) return 'Choose a delivery method.'
         if (input.paymentMethod === 'cod' && !state.settings.codEnabled) return 'Cash on delivery is not available.'
-        if (input.paymentMethod === 'gcash' && !state.settings.gcashEnabled) return 'GCash instructions are not available.'
+        if (
+          (input.paymentMethod === 'gcash' || input.paymentMethod === 'gcash_manual') &&
+          !state.settings.gcashEnabled
+        ) {
+          return 'GCash is not available.'
+        }
+        if (input.paymentMethod === 'maya_manual' && !state.settings.mayaEnabled) return 'Maya is not available.'
+        if (input.paymentMethod === 'qrph_manual' && !state.settings.qrphEnabled) return 'QR Ph is not available.'
+        if (input.paymentMethod === 'xendit' && !state.settings.xenditEnabled) return 'Online checkout is not available.'
         if (input.paymentMethod === 'paymongo') return 'PayMongo is not connected.'
+        if (mode === 'production' && manualMethodsRequireProof(input.paymentMethod)) {
+          if (!input.proofFile) return 'Upload your payment receipt.'
+          if (!input.referenceNumber?.trim()) return 'Enter the payment reference number.'
+        }
         const shippingCentavos = method.feeCentavos
         const totalCentavos = Math.max(0, subtotalCentavos - discountCentavos + shippingCentavos)
         const orderNumber = `EBW-2026-${state.nextOrderSeq}`
-        const paymentStatus = input.paymentMethod === 'gcash' ? 'pending_verification' : 'unpaid'
+        const paymentStatus = manualMethodsRequireProof(input.paymentMethod) ? 'pending_verification' : 'unpaid'
+        if (mode === 'production') {
+          try {
+            let rpcPaymentMethod = input.paymentMethod
+            if (input.paymentMethod === 'xendit') {
+              if (state.settings.qrphEnabled) rpcPaymentMethod = 'qrph_manual'
+              else if (state.settings.gcashEnabled) rpcPaymentMethod = 'gcash_manual'
+              else return 'Enable GCash or QR Ph in settings before using Xendit checkout.'
+            }
+            const orderId = await productionPlaceOrder({
+              customerName: input.customerName,
+              email: input.email,
+              phone: input.phone,
+              address: input.address,
+              lines: input.lines,
+              couponCode: input.couponCode,
+              shippingMethodId: input.shippingMethodId,
+              paymentMethod: rpcPaymentMethod,
+              notes: input.notes,
+              idempotencyKey: uid('idem'),
+            })
+            if (manualMethodsRequireProof(input.paymentMethod) && input.proofFile) {
+              const storagePath = await uploadPaymentProof(input.proofFile, orderId)
+              await productionSubmitPaymentProof({
+                orderId,
+                storagePath,
+                referenceNumber: input.referenceNumber?.trim() ?? '',
+                fileName: input.proofFile.name,
+                mimeType: input.proofFile.type || 'application/octet-stream',
+              })
+            }
+            if (input.paymentMethod === 'xendit' && state.settings.xenditEnabled) {
+              const preview = await productionFetchOrderById(orderId)
+              const startCheckout = xenditPaymentProvider.createCheckoutSession
+              if (preview && startCheckout) {
+                const gateway = await startCheckout({
+                  orderId,
+                  orderNumber: preview.orderNumber,
+                  amountCentavos: preview.totalCentavos,
+                  currency: 'PHP',
+                  customerEmail: input.email,
+                  customerName: input.customerName,
+                  description: `Order ${preview.orderNumber}`,
+                })
+                if (gateway.ok && gateway.checkoutUrl) {
+                  window.location.assign(gateway.checkoutUrl)
+                  return preview
+                }
+                if (!gateway.ok) return gateway.message
+              }
+            }
+            const next = await loadProductionState(state.settings)
+            setState(next)
+            const placed = next.orders.find((entry) => entry.id === orderId) ?? (await productionFetchOrderById(orderId))
+            if (!placed) return 'Order placed, but details could not be loaded. Check your order history.'
+            return placed
+          } catch (reason: unknown) {
+            return reason instanceof Error ? reason.message : 'Could not place the order.'
+          }
+        }
+
         const order: Order = {
           id: uid('ord'),
           orderNumber,
@@ -357,6 +459,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           notes: input.notes,
           trackingNumber: '',
           proofName: input.proofName,
+          latestProofId: null,
           history: [
             {
               at: new Date().toISOString(),
@@ -398,7 +501,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             input.customerName,
           )
         })
-        if (mode === 'production') void productionPlaceOrder(order)
         return order
       },
       saveSettings: (settings) => {

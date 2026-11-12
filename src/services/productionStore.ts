@@ -1,6 +1,16 @@
-import { buildSeed } from '@/data/demo/seed'
 import { getSupabase } from '@/lib/supabase'
-import type { Brand, DemoState, Order, PackStyle, Product } from '@/types'
+import { toDbPaymentMethod } from '@/lib/paymentMethods'
+import type {
+  Brand,
+  Category,
+  Coupon,
+  DemoState,
+  Order,
+  PackStyle,
+  PaymentProof,
+  Product,
+  StoreSettings,
+} from '@/types'
 
 type Row = Record<string, unknown>
 
@@ -10,6 +20,13 @@ function asText(value: unknown, fallback = '') {
 
 function asNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' ? value : fallback
+}
+
+function mapPaymentMethod(value: string): Order['paymentMethod'] {
+  if (value === 'gcash_manual' || value === 'maya_manual' || value === 'qrph_manual') return value
+  if (value === 'cod') return 'cod'
+  if (value === 'gcash') return 'gcash_manual'
+  return 'cod'
 }
 
 function mapProduct(row: Row): Product {
@@ -55,67 +72,34 @@ function mapProduct(row: Row): Product {
   }
 }
 
-export async function loadProductionState(): Promise<DemoState> {
-  const supabase = getSupabase()
-  if (!supabase) throw new Error('Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before using production mode.')
-  const base = buildSeed()
-  const [categories, brands, products, orders, settings] = await Promise.all([
-    supabase.from('categories').select('*').order('sort_order'),
-    supabase.from('brands').select('*').order('sort_order'),
-    supabase.from('products').select('*, product_variants(*)').order('created_at', { ascending: false }),
-    supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }),
-    supabase.from('store_settings').select('*').limit(1).maybeSingle(),
-  ])
-  if (categories.error) throw new Error(categories.error.message)
-  if (brands.error) throw new Error(brands.error.message)
-  if (products.error) throw new Error(products.error.message)
-  if (orders.error) throw new Error(orders.error.message)
-
+function mapSettingsRow(row: Row, base: StoreSettings): StoreSettings {
   return {
     ...base,
-    categories: (categories.data ?? []).map((row) => ({
-      id: asText(row.id),
-      name: asText(row.name),
-      slug: asText(row.slug),
-      symbol: asText(row.symbol, '✦'),
-      tint: asText(row.tint, '#faeaf0'),
-      imageUrl: row.image_url == null ? null : asText(row.image_url),
-      active: Boolean(row.active),
-      sortOrder: asNumber(row.sort_order),
-      showOnHomepage: Boolean(row.show_on_homepage),
-      showInNav: Boolean(row.show_in_nav),
-      blurb: asText(row.blurb, 'Shop collection →'),
-    })),
-    brands: (brands.data ?? []).map((row) => ({
-      id: asText(row.id),
-      name: asText(row.name),
-      slug: asText(row.slug),
-      logoUrl: row.logo_url == null ? null : asText(row.logo_url),
-      tint: asText(row.tint, '#fff0f7'),
-      active: Boolean(row.active),
-      sortOrder: asNumber(row.sort_order),
-      showOnHomepage: Boolean(row.show_on_homepage),
-      blurb: asText(row.blurb, 'View products →'),
-    })),
-    products: (products.data ?? []).map((row) => mapProduct(row as Row)),
-    orders: (orders.data ?? []).map((row) => mapOrder(row as Row)),
-    settings: settings.data
-      ? {
-          ...base.settings,
-          businessName: asText(settings.data.business_name, base.settings.businessName),
-          legalName: asText(settings.data.legal_name, base.settings.legalName),
-          address: asText(settings.data.address, base.settings.address),
-          phone: asText(settings.data.phone, base.settings.phone),
-          announcement: asText(settings.data.announcement, base.settings.announcement),
-          lowStockThreshold: asNumber(settings.data.low_stock_threshold, base.settings.lowStockThreshold),
-          showPreviewCatalogueNotice:
-            settings.data.show_preview_catalogue_notice == null
-              ? base.settings.showPreviewCatalogueNotice
-              : Boolean(settings.data.show_preview_catalogue_notice),
-        }
-      : base.settings,
-    users: [],
-    banners: base.banners,
+    businessName: asText(row.business_name, base.businessName),
+    legalName: asText(row.legal_name, base.legalName),
+    address: asText(row.address, base.address),
+    phone: asText(row.phone, base.phone),
+    email: asText(row.email, base.email),
+    announcement: asText(row.announcement, base.announcement),
+    lowStockThreshold: asNumber(row.low_stock_threshold, base.lowStockThreshold),
+    showPreviewCatalogueNotice:
+      row.show_preview_catalogue_notice == null
+        ? base.showPreviewCatalogueNotice
+        : Boolean(row.show_preview_catalogue_notice),
+    codEnabled: row.cod_enabled == null ? base.codEnabled : Boolean(row.cod_enabled),
+    gcashEnabled: row.gcash_enabled == null ? base.gcashEnabled : Boolean(row.gcash_enabled),
+    gcashAccountName: asText(row.gcash_account_name, base.gcashAccountName),
+    gcashNumber: asText(row.gcash_number, base.gcashNumber),
+    gcashInstructions: asText(row.gcash_instructions, base.gcashInstructions),
+    mayaEnabled: Boolean(row.maya_enabled),
+    mayaAccountName: asText(row.maya_account_name, ''),
+    mayaNumber: asText(row.maya_number, ''),
+    mayaInstructions: asText(row.maya_instructions, ''),
+    qrphEnabled: Boolean(row.qrph_enabled),
+    qrphDisplayName: asText(row.qrph_display_name, 'QR Ph'),
+    qrphRecipientInfo: asText(row.qrph_recipient_info, ''),
+    qrphInstructions: asText(row.qrph_instructions, ''),
+    xenditEnabled: Boolean(row.xendit_enabled),
   }
 }
 
@@ -163,20 +147,170 @@ function mapOrder(row: Row): Order {
     couponCode: row.coupon_code == null ? null : asText(row.coupon_code),
     shippingMethodId: asText(row.shipping_method_id),
     shippingMethodName: asText(row.shipping_method_name, 'Delivery'),
-    paymentMethod: (asText(row.payment_method, 'cod') as Order['paymentMethod']) || 'cod',
+    paymentMethod: mapPaymentMethod(asText(row.payment_method, 'cod')),
     paymentStatus: (asText(row.payment_status, 'unpaid') as Order['paymentStatus']) || 'unpaid',
     fulfillmentStatus: (asText(row.fulfillment_status, 'pending') as Order['fulfillmentStatus']) || 'pending',
     notes: asText(row.notes),
     trackingNumber: asText(row.tracking_number),
     proofName: null,
+    latestProofId: null,
     history: [],
     demo: true,
+  }
+}
+
+const defaultPolicies: StoreSettings['policies'] = {
+  shipping: '',
+  returns: '',
+  privacy: '',
+  terms: '',
+}
+
+export async function loadProductionState(settingsBase?: StoreSettings): Promise<DemoState> {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before using production mode.')
+
+  const settingsFallback: StoreSettings = settingsBase ?? {
+    businessName: 'Earth Beauty & Wellness',
+    legalName: 'Earth Beauty & Wellness, OPC',
+    address: '',
+    phone: '',
+    email: '',
+    announcement: '',
+    heroEyebrow: '',
+    about: '',
+    instagram: '',
+    facebook: '',
+    tiktok: '',
+    lowStockThreshold: 8,
+    gcashAccountName: '',
+    gcashNumber: '',
+    gcashInstructions: '',
+    codEnabled: true,
+    gcashEnabled: true,
+    mayaEnabled: false,
+    mayaAccountName: '',
+    mayaNumber: '',
+    mayaInstructions: '',
+    qrphEnabled: false,
+    qrphDisplayName: 'QR Ph',
+    qrphRecipientInfo: '',
+    qrphInstructions: '',
+    xenditEnabled: false,
+    showPreviewCatalogueNotice: false,
+    paymongoNote: '',
+    policies: defaultPolicies,
+  }
+
+  const [categories, brands, products, orders, settings, shipping, coupons, banners] = await Promise.all([
+    supabase.from('categories').select('*').order('sort_order'),
+    supabase.from('brands').select('*').order('sort_order'),
+    supabase.from('products').select('*, product_variants(*)').order('created_at', { ascending: false }),
+    supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }),
+    supabase.from('store_settings').select('*').limit(1).maybeSingle(),
+    supabase.from('shipping_methods').select('*').order('name'),
+    supabase.from('coupons').select('*').order('code'),
+    supabase.from('banners').select('*').order('sort_order'),
+  ])
+
+  for (const result of [categories, brands, products, orders, shipping, coupons, banners]) {
+    if (result.error) throw new Error(result.error.message)
+  }
+
+  return {
+    seedVersion: 1,
+    nextOrderSeq: 1,
+    categories: (categories.data ?? []).map((row) => ({
+      id: asText(row.id),
+      name: asText(row.name),
+      slug: asText(row.slug),
+      symbol: asText(row.symbol, '✦'),
+      tint: asText(row.tint, '#faeaf0'),
+      imageUrl: row.image_url == null ? null : asText(row.image_url),
+      active: Boolean(row.active),
+      sortOrder: asNumber(row.sort_order),
+      showOnHomepage: Boolean(row.show_on_homepage),
+      showInNav: Boolean(row.show_in_nav),
+      blurb: asText(row.blurb, 'Shop collection →'),
+    })),
+    brands: (brands.data ?? []).map((row) => ({
+      id: asText(row.id),
+      name: asText(row.name),
+      slug: asText(row.slug),
+      logoUrl: row.logo_url == null ? null : asText(row.logo_url),
+      tint: asText(row.tint, '#fff0f7'),
+      active: Boolean(row.active),
+      sortOrder: asNumber(row.sort_order),
+      showOnHomepage: Boolean(row.show_on_homepage),
+      blurb: asText(row.blurb, 'View products →'),
+    })),
+    products: (products.data ?? []).map((row) => mapProduct(row as Row)),
+    orders: (orders.data ?? []).map((row) => mapOrder(row as Row)),
+    settings: settings.data ? mapSettingsRow(settings.data as Row, settingsFallback) : settingsFallback,
+    shippingMethods: (shipping.data ?? []).map((row) => ({
+      id: asText(row.id),
+      name: asText(row.name),
+      feeCentavos: asNumber(row.fee_centavos),
+      detail: asText(row.detail, ''),
+      active: Boolean(row.active),
+    })),
+    coupons: (coupons.data ?? []).map((row) => ({
+      id: asText(row.id),
+      code: asText(row.code),
+      type: (asText(row.type, 'percent') as Coupon['type']) || 'percent',
+      amount: asNumber(row.amount),
+      active: Boolean(row.active),
+      minSubtotalCentavos: asNumber(row.min_subtotal_centavos),
+      label: asText(row.label, asText(row.code)),
+    })),
+    banners: (banners.data ?? []).map((row) => ({
+      id: asText(row.id),
+      eyebrow: asText(row.eyebrow, ''),
+      title: asText(row.title),
+      subtitle: asText(row.subtitle, ''),
+      buttonLabel: asText(row.button_label, 'SHOP NOW'),
+      href: asText(row.href, '/shop'),
+      active: Boolean(row.active),
+      sortOrder: asNumber(row.sort_order),
+      imageNote: asText(row.image_url, ''),
+    })),
+    users: [],
+    movements: [],
+    audit: [],
+    newsletter: [],
   }
 }
 
 export async function productionSave(kind: string, payload: unknown) {
   const supabase = getSupabase()
   if (!supabase) return
+
+  if (kind === 'category') {
+    const category = payload as Category
+    const { error } = await supabase.from('categories').upsert({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      symbol: category.symbol,
+      tint: category.tint,
+      image_url: category.imageUrl,
+      blurb: category.blurb,
+      active: category.active,
+      sort_order: category.sortOrder,
+      show_on_homepage: category.showOnHomepage,
+      show_in_nav: category.showInNav,
+    })
+    if (error) throw new Error(error.message)
+    return
+  }
+
+  if (kind === 'delete-category') {
+    const { id } = payload as { id: string }
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    return
+  }
+
   if (kind === 'brand') {
     const brand = payload as Brand
     const { error } = await supabase.from('brands').upsert({
@@ -193,15 +327,17 @@ export async function productionSave(kind: string, payload: unknown) {
     if (error) throw new Error(error.message)
     return
   }
+
   if (kind === 'delete-brand') {
     const { id } = payload as { id: string }
     const { error } = await supabase.from('brands').delete().eq('id', id)
     if (error) throw new Error(error.message)
     return
   }
+
   if (kind === 'product') {
     const product = payload as Product
-    const { error } = await supabase.from('products').upsert({
+    const { error: productError } = await supabase.from('products').upsert({
       id: product.id,
       name: product.name,
       slug: product.slug,
@@ -223,21 +359,73 @@ export async function productionSave(kind: string, payload: unknown) {
       best_seller: product.bestSeller,
       active: product.active,
     })
+    if (productError) throw new Error(productError.message)
+    for (const variant of product.variants) {
+      const { error } = await supabase.from('product_variants').upsert({
+        id: variant.id,
+        product_id: product.id,
+        label: variant.label,
+        sku: variant.sku,
+        price_centavos: variant.priceCentavos,
+        compare_at_centavos: variant.compareAtCentavos,
+        stock: variant.stock,
+        active: variant.active,
+      })
+      if (error) throw new Error(error.message)
+    }
+    return
+  }
+
+  if (kind === 'delete-product') {
+    const { id } = payload as { id: string }
+    await supabase.from('product_variants').delete().eq('product_id', id)
+    const { error } = await supabase.from('products').delete().eq('id', id)
     if (error) throw new Error(error.message)
     return
   }
+
   if (kind === 'settings') {
-    const settings = payload as DemoState['settings']
+    const settings = payload as StoreSettings
     const { error } = await supabase.from('store_settings').upsert({
       id: 1,
       business_name: settings.businessName,
       legal_name: settings.legalName,
       address: settings.address,
       phone: settings.phone,
+      email: settings.email,
       announcement: settings.announcement,
       low_stock_threshold: settings.lowStockThreshold,
       show_preview_catalogue_notice: settings.showPreviewCatalogueNotice,
+      cod_enabled: settings.codEnabled,
+      gcash_enabled: settings.gcashEnabled,
+      gcash_account_name: settings.gcashAccountName,
+      gcash_number: settings.gcashNumber,
+      gcash_instructions: settings.gcashInstructions,
+      maya_enabled: settings.mayaEnabled,
+      maya_account_name: settings.mayaAccountName,
+      maya_number: settings.mayaNumber,
+      maya_instructions: settings.mayaInstructions,
+      qrph_enabled: settings.qrphEnabled,
+      qrph_display_name: settings.qrphDisplayName,
+      qrph_recipient_info: settings.qrphRecipientInfo,
+      qrph_instructions: settings.qrphInstructions,
+      xendit_enabled: settings.xenditEnabled,
     })
+    if (error) throw new Error(error.message)
+    return
+  }
+
+  if (kind === 'order') {
+    const { orderId, patch } = payload as { orderId: string; patch: Partial<Order> }
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        fulfillment_status: patch.fulfillmentStatus,
+        payment_status: patch.paymentStatus,
+        tracking_number: patch.trackingNumber,
+        notes: patch.notes,
+      })
+      .eq('id', orderId)
     if (error) throw new Error(error.message)
   }
 }
@@ -254,25 +442,126 @@ export async function productionAdjustStock(productId: string, variantId: string
   if (error) throw new Error(error.message)
 }
 
-export async function productionPlaceOrder(order: Order) {
+export type PlaceOrderPayload = {
+  customerName: string
+  email: string
+  phone: string
+  address: Order['address']
+  lines: { productId: string; variantId: string | null; quantity: number }[]
+  couponCode: string | null
+  shippingMethodId: string
+  paymentMethod: Order['paymentMethod']
+  notes: string
+  idempotencyKey?: string
+}
+
+export async function productionPlaceOrder(input: PlaceOrderPayload): Promise<string> {
   const supabase = getSupabase()
-  if (!supabase) return
-  const { error } = await supabase.rpc('place_order', {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { data, error } = await supabase.rpc('place_order', {
     payload: {
-      email: order.email,
-      customer_name: order.customerName,
-      phone: order.phone,
-      address: order.address,
-      items: order.items.map((item) => ({
-        product_id: item.productId,
-        variant_id: item.variantId,
-        quantity: item.quantity,
+      customer_name: input.customerName,
+      email: input.email,
+      phone: input.phone,
+      address: {
+        street: input.address.street,
+        region: input.address.region,
+        province: input.address.province,
+        city: input.address.city,
+        barangay: input.address.barangay,
+        postalCode: input.address.postalCode,
+      },
+      items: input.lines.map((line) => ({
+        product_id: line.productId,
+        variant_id: line.variantId,
+        quantity: line.quantity,
       })),
-      shipping_method_id: order.shippingMethodId,
-      coupon_code: order.couponCode,
-      payment_method: order.paymentMethod,
-      notes: order.notes,
+      shipping_method_id: input.shippingMethodId,
+      coupon_code: input.couponCode,
+      payment_method: toDbPaymentMethod(input.paymentMethod),
+      notes: input.notes,
+      idempotency_key: input.idempotencyKey,
     },
   })
   if (error) throw new Error(error.message)
+  return String(data)
+}
+
+export async function productionSubmitPaymentProof(payload: {
+  orderId: string
+  storagePath: string
+  referenceNumber: string
+  fileName: string
+  mimeType: string
+}) {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { error } = await supabase.rpc('submit_payment_proof', {
+    payload: {
+      order_id: payload.orderId,
+      storage_path: payload.storagePath,
+      reference_number: payload.referenceNumber,
+      file_name: payload.fileName,
+      mime_type: payload.mimeType,
+    },
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function productionVerifyPayment(payload: {
+  orderId: string
+  proofId: string
+  decision: 'approve' | 'reject' | 'request_resubmit'
+  adminNotes?: string
+  rejectionReason?: string
+}) {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { error } = await supabase.rpc('verify_payment', {
+    payload: {
+      order_id: payload.orderId,
+      proof_id: payload.proofId,
+      decision: payload.decision,
+      admin_notes: payload.adminNotes ?? '',
+      rejection_reason: payload.rejectionReason ?? '',
+    },
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function productionMarkCodCollected(orderId: string) {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { error } = await supabase.rpc('mark_cod_collected', { payload: { order_id: orderId } })
+  if (error) throw new Error(error.message)
+}
+
+export async function productionFetchOrderProofs(orderId: string): Promise<PaymentProof[]> {
+  const supabase = getSupabase()
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('payment_proofs')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: false })
+  if (error) return []
+  return (data ?? []).map((row) => ({
+    id: asText(row.id),
+    orderId: asText(row.order_id),
+    storagePath: asText(row.storage_path),
+    fileName: asText(row.file_name),
+    mimeType: asText(row.mime_type),
+    referenceNumber: asText(row.reference_number),
+    verificationStatus: asText(row.verification_status),
+    attemptNumber: asNumber(row.attempt_number),
+    createdAt: asText(row.created_at),
+  }))
+}
+
+export async function productionFetchOrderById(orderId: string): Promise<Order | null> {
+  const supabase = getSupabase()
+  if (!supabase) return null
+  const { data, error } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).maybeSingle()
+  if (error || !data) return null
+  return mapOrder(data as Row)
 }
