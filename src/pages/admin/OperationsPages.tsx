@@ -3,9 +3,6 @@ import { PaymentSettingsCards } from '@/components/admin/PaymentSettingsCards'
 import { PolicySettingsEditor } from '@/components/admin/PolicySettingsEditor'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Bar, BarChart, ResponsiveContainer, XAxis } from 'recharts'
-import { sampleSales } from '@/data/demo/dashboard'
-import { lastSevenDaySales, paidOrders } from '@/features/admin/dashboardMetrics'
 import { useStore } from '@/features/store/StoreContext'
 import { productionFetchOrderProofs, productionMarkCodCollected, productionVerifyPayment } from '@/services/productionStore'
 import { signedProofUrl } from '@/services/storageUpload'
@@ -329,73 +326,7 @@ function blankCoupon(): Coupon {
   return { id: uid('cp'), code: 'NEWCODE', type: 'percent', amount: 10, active: false, minSubtotalCentavos: 0, label: 'Demonstration voucher' }
 }
 
-export function ReportsAdminPage() {
-  const { state, mode } = useStore()
-  const [from, setFrom] = useState('2026-10-01')
-  const [to, setTo] = useState('2026-11-30')
-  const orders = state.orders.filter((order) => order.createdAt.slice(0, 10) >= from && order.createdAt.slice(0, 10) <= to)
-  const paidInRange = paidOrders(orders)
-  const chartData =
-    mode === 'production'
-      ? lastSevenDaySales(state.orders).map((point) => ({ day: point.day, amount: point.amount, bar: Number.parseInt(point.bar, 10) || 0 }))
-      : sampleSales
-  const byStatus = fulfillmentOptions.map((status) => ({ status, count: orders.filter((order) => order.fulfillmentStatus === status).length }))
-  function exportCsv() {
-    const header = 'order,date,customer,total_centavos,payment,fulfillment,demo'
-    const body = orders.map((order) => [order.orderNumber, order.createdAt, order.customerName, order.totalCentavos, order.paymentStatus, order.fulfillmentStatus, 'yes'].join(','))
-    const blob = new Blob([[header, ...body].join('\n')], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = mode === 'production' ? 'earth-beauty-orders.csv' : 'earth-beauty-demo-orders.csv'
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-  return (
-    <>
-      <div className="between">
-        <div>
-          <div className="eyebrow">REPORTS</div>
-          <h1 style={{ font: '31px Georgia, serif' }}>Reports</h1>
-        </div>
-        <button className="btn outline" onClick={exportCsv}>EXPORT CSV</button>
-      </div>
-      {mode === 'demo' ? (
-        <div className="notice">These rows are fictional demonstration orders. They are not Earth Beauty & Wellness revenue.</div>
-      ) : null}
-      <div className="row">
-        <input className="field-input" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-        <input className="field-input" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-      </div>
-      <div className="grid2" style={{ marginTop: 16 }}>
-        <div className="whitepanel">
-          <h3>{mode === 'production' ? 'Paid revenue (last 7 days)' : 'Sample weekly shape'}</h3>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <XAxis dataKey="day" tickLine={false} axisLine={false} />
-                <Bar dataKey="amount" fill="#F20A87" radius={[5, 5, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div className="whitepanel">
-          <h3>Orders by status in range</h3>
-          {byStatus.map((row) => <div key={row.status} className="between" style={{ padding: '8px 0' }}><span>{fulfillmentLabel(row.status)}</span><b>{row.count}</b></div>)}
-          <div className="line" />
-          <div className="between">
-            <span>{mode === 'production' ? 'Paid total in range' : 'Preview total'}</span>
-            <b>{formatPeso((mode === 'production' ? paidInRange : orders).reduce((sum, order) => sum + order.totalCentavos, 0))}</b>
-          </div>
-        </div>
-      </div>
-      <div className="whitepanel" style={{ marginTop: 16 }}>
-        <h3>Inventory summary</h3>
-        <p className="muted small">{state.products.filter((product) => product.stock <= state.settings.lowStockThreshold).length} products are at or below {state.settings.lowStockThreshold} units.</p>
-      </div>
-    </>
-  )
-}
+export { ReportsAdminPage } from './ReportsAdminPage'
 
 export function SettingsAdminPage() {
   const { state, saveSettings, saveShipping, resetDemo, mode } = useStore()
