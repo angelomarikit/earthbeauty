@@ -30,7 +30,7 @@ export function LoginPage() {
             style={{ marginTop: 16 }}
             onSubmit={form.handleSubmit(async (values) => {
               const result = await login(values.email, values.password)
-              if (result.error) setError(result.error)
+              if (!result.ok) setError(result.error)
               else {
                 const next = params.get('next') || (result.role === 'admin' ? '/admin' : '/account')
                 navigate(next)
