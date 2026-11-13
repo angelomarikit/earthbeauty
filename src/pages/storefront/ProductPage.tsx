@@ -57,8 +57,9 @@ export function ProductPage() {
     )
   }
 
-  const savePercent = variant.compareAtCentavos && variant.compareAtCentavos > unitPrice(product, variant)
-    ? Math.round((1 - unitPrice(product, variant) / variant.compareAtCentavos) * 100)
+  const wasPrice = comparePrice(product, variant)
+  const savePercent = wasPrice
+    ? Math.round((1 - unitPrice(product, variant) / wasPrice) * 100)
     : 0
 
   function addLine(buyNow = false) {

@@ -4,7 +4,14 @@ import { AdminConfirmModal, AdminTextPromptModal } from '@/components/admin/Admi
 import { ProductImagesEditor } from '@/components/admin/ProductImagesEditor'
 import { FileUploadField } from '@/components/forms/FileUploadField'
 import { PackArt } from '@/components/product/ProductCard'
-import { brandName, categoryName } from '@/features/catalog/pricing'
+import {
+  brandName,
+  catalogUnitPrice,
+  categoryName,
+  comparePrice,
+  normalizeProductPricing,
+  storefrontVariant,
+} from '@/features/catalog/pricing'
 import { useStore } from '@/features/store/StoreContext'
 import { entityUuid, formatPeso, slugify, uid } from '@/lib/format'
 import { normalizeProductImages, productThumbnailUrl, syncProductImageUrl } from '@/lib/productImages'
@@ -21,7 +28,13 @@ export function ProductsAdminPage() {
     let items = state.products.filter((product) => product.name.toLowerCase().includes(q.toLowerCase()) || product.sku.toLowerCase().includes(q.toLowerCase()))
     if (status === 'active') items = items.filter((product) => product.active)
     if (status === 'hidden') items = items.filter((product) => !product.active)
-    items = [...items].sort((a, b) => (sort === 'price' ? a.priceCentavos - b.priceCentavos : sort === 'stock' ? a.stock - b.stock : a.name.localeCompare(b.name)))
+    items = [...items].sort((a, b) =>
+      sort === 'price'
+        ? catalogUnitPrice(a) - catalogUnitPrice(b)
+        : sort === 'stock'
+          ? a.stock - b.stock
+          : a.name.localeCompare(b.name),
+    )
     return items
   }, [q, sort, state.products, status])
 
@@ -64,8 +77,8 @@ export function ProductsAdminPage() {
                   <td>{product.sku}</td>
                   <td className="small">{brandName(state, product.brandId, '—')}</td>
                   <td>{categoryName(state, product.categoryId)}</td>
-                  <td>{formatPeso(product.compareAtCentavos ?? product.priceCentavos)}</td>
-                  <td>{formatPeso(product.priceCentavos)}</td>
+                  <td>{formatPeso(comparePrice(product, storefrontVariant(product)) ?? catalogUnitPrice(product))}</td>
+                  <td>{formatPeso(catalogUnitPrice(product))}</td>
                   <td>{product.stock}</td>
                   <td><span className={product.active ? 'status' : 'status muted'}>{product.active ? 'Active' : 'Hidden'}</span></td>
                   <td>
@@ -150,15 +163,17 @@ export function ProductFormPage() {
             }
             if (images.length && !images.some((image) => image.isHero)) images[0] = { ...images[0], isHero: true }
             if (images.length && !images.some((image) => image.isThumbnail)) images[0] = { ...images[0], isThumbnail: true }
-            const product = syncProductImageUrl({
-              ...form,
-              slug,
-              variants,
-              stock,
-              images,
-              priceCentavos: variants[0]?.priceCentavos ?? form.priceCentavos,
-              demo: true,
-            })
+            const product = normalizeProductPricing(
+              syncProductImageUrl({
+                ...form,
+                slug,
+                variants,
+                stock,
+                images,
+                priceCentavos: variants[0]?.priceCentavos ?? form.priceCentavos,
+                demo: true,
+              }),
+            )
             saveProduct(product)
             navigate('/admin/products')
           } catch (reason: unknown) {
@@ -192,8 +207,8 @@ export function ProductFormPage() {
           </Field>
           <Field label="SKU"><input className="field-input" value={form.sku} onChange={(event) => update('sku', event.target.value)} /></Field>
           <div className="grid2">
-            <Field label="Sale price (₱)"><input className="field-input" type="number" min={0} value={form.priceCentavos / 100} onChange={(event) => update('priceCentavos', Math.round(Number(event.target.value) * 100))} /></Field>
-            <Field label="Regular price (₱)"><input className="field-input" type="number" min={0} value={(form.compareAtCentavos ?? 0) / 100} onChange={(event) => update('compareAtCentavos', Math.round(Number(event.target.value) * 100) || null)} /></Field>
+            <Field label="Sale price (₱) — what customers pay"><input className="field-input" type="number" min={0} value={form.priceCentavos / 100} onChange={(event) => update('priceCentavos', Math.round(Number(event.target.value) * 100))} /></Field>
+            <Field label="Regular price (₱) — optional, for sale badge / strikethrough"><input className="field-input" type="number" min={0} value={(form.compareAtCentavos ?? 0) / 100} onChange={(event) => update('compareAtCentavos', Math.round(Number(event.target.value) * 100) || null)} /></Field>
           </div>
           <Field label="Badge"><input className="field-input" value={form.badge ?? ''} onChange={(event) => update('badge', event.target.value || null)} /></Field>
           <label className="checkline"><input type="checkbox" checked={form.featured} onChange={(event) => update('featured', event.target.checked)} /> Featured on homepage</label>

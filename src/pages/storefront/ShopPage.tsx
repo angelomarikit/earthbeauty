@@ -2,7 +2,7 @@ import { LayoutGrid, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ProductGrid } from '@/components/product/ProductCard'
-import { isOnSale } from '@/features/catalog/pricing'
+import { catalogUnitPrice, isOnSale } from '@/features/catalog/pricing'
 import { useStore } from '@/features/store/StoreContext'
 import { usePageMeta } from '@/lib/seo'
 import type { Product } from '@/types'
@@ -57,7 +57,7 @@ export function ShopPage() {
     if (collection === 'new') items = items.filter((product) => product.isNew)
     if (inStock) items = items.filter((product) => product.stock > 0)
     if (onSale) items = items.filter((product) => isOnSale(product))
-    items = items.filter((product) => product.priceCentavos <= max * 100)
+    items = items.filter((product) => catalogUnitPrice(product) <= max * 100)
     const sorted = [...items]
     sorted.sort((a, b) => compareProducts(a, b, sort))
     return sorted
@@ -208,8 +208,8 @@ export function ShopPage() {
 
 function compareProducts(a: Product, b: Product, sort: string) {
   if (sort === 'newest') return +new Date(b.createdAt) - +new Date(a.createdAt)
-  if (sort === 'price-asc') return a.priceCentavos - b.priceCentavos
-  if (sort === 'price-desc') return b.priceCentavos - a.priceCentavos
+  if (sort === 'price-asc') return catalogUnitPrice(a) - catalogUnitPrice(b)
+  if (sort === 'price-desc') return catalogUnitPrice(b) - catalogUnitPrice(a)
   if (sort === 'best') return b.demoUnitsSold - a.demoUnitsSold
   if (a.featured !== b.featured) return a.featured ? -1 : 1
   return b.demoUnitsSold - a.demoUnitsSold

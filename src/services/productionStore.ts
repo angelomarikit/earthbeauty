@@ -1,5 +1,6 @@
 import { defaultShippingMethods } from '@/data/shipping/defaultMethods'
 import { isUuid } from '@/lib/ids'
+import { normalizeProductPricing } from '@/features/catalog/pricing'
 import { getSupabase } from '@/lib/supabase'
 import { entityUuid } from '@/lib/format'
 import { toDbPaymentMethod } from '@/lib/paymentMethods'
@@ -66,7 +67,7 @@ function mapProduct(row: Row): Product {
   const images = imageRows
     .map((entry) => mapProductImage(entry as Row))
     .sort((a, b) => a.sortOrder - b.sortOrder)
-  return {
+  return normalizeProductPricing({
     id: asText(row.id),
     name: asText(row.name),
     slug: asText(row.slug),
@@ -105,7 +106,7 @@ function mapProduct(row: Row): Product {
     demoUnitsSold: 0,
     createdAt: asText(row.created_at, new Date().toISOString()),
     demo: false,
-  }
+  })
 }
 
 function mapPolicies(row: Row, base: StoreSettings['policies']): StoreSettings['policies'] {
@@ -397,7 +398,7 @@ export async function productionSave(kind: string, payload: unknown) {
   }
 
   if (kind === 'product') {
-    const product = payload as Product
+    const product = normalizeProductPricing(payload as Product)
     const { error: productError } = await supabase.from('products').upsert({
       id: product.id,
       name: product.name,

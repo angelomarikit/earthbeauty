@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } 
 import { BrandLogo } from '@/components/branding/BrandLogo'
 import { PackArt } from '@/components/product/ProductCard'
 import { useAuth } from '@/features/auth/AuthContext'
+import { catalogUnitPrice } from '@/features/catalog/pricing'
 import { useCart } from '@/features/cart/CartContext'
 import { useStore } from '@/features/store/StoreContext'
 import { formatDate, formatPeso, fulfillmentClass, fulfillmentLabel } from '@/lib/format'
@@ -195,7 +196,7 @@ export function WishlistPage() {
             {products.map((product) => (
               <Link key={product.id} to={`/product/${product.slug}`} className="product">
                 <div className="pimg"><PackArt type={product.pack} /></div>
-                <div className="pbody"><h3>{product.name}</h3><div className="price">{formatPeso(product.priceCentavos)}</div></div>
+                <div className="pbody"><h3>{product.name}</h3><div className="price">{formatPeso(catalogUnitPrice(product))}</div></div>
               </Link>
             ))}
           </div>

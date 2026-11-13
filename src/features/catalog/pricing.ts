@@ -73,12 +73,76 @@ export function findVariant(product: Product, variantId: string | null): Variant
   return DATA_MODE === 'demo' ? defaultVariant(product) : null
 }
 
+export function normalizeCentavosPricing(
+  priceCentavos: number,
+  compareAtCentavos: number | null,
+): { priceCentavos: number; compareAtCentavos: number | null } {
+  const price = Math.max(0, Math.round(priceCentavos))
+  const compare =
+    compareAtCentavos == null || compareAtCentavos <= 0 ? null : Math.round(compareAtCentavos)
+  if (price > 0) {
+    if (compare != null && compare <= price) return { priceCentavos: price, compareAtCentavos: null }
+    return { priceCentavos: price, compareAtCentavos: compare }
+  }
+  if (compare != null) return { priceCentavos: compare, compareAtCentavos: null }
+  return { priceCentavos: 0, compareAtCentavos: null }
+}
+
+/** Selling price shown in shop, cart, and checkout. Zero sale price falls back to regular (compare-at). */
 export function unitPrice(product: Product, variant?: Variant | null) {
+  if (variant && variant.priceCentavos > 0) {
+    return normalizeCentavosPricing(variant.priceCentavos, variant.compareAtCentavos).priceCentavos
+  }
+  if (product.priceCentavos > 0) {
+    return normalizeCentavosPricing(product.priceCentavos, product.compareAtCentavos).priceCentavos
+  }
+  const compare = variant?.compareAtCentavos ?? product.compareAtCentavos
+  if (compare != null && compare > 0) return compare
   return variant?.priceCentavos ?? product.priceCentavos
 }
 
+/** Strikethrough “was” price — only when higher than the selling price. */
 export function comparePrice(product: Product, variant?: Variant | null) {
-  return variant?.compareAtCentavos ?? product.compareAtCentavos
+  const sale = unitPrice(product, variant)
+  const compare = variant?.compareAtCentavos ?? product.compareAtCentavos
+  if (compare != null && compare > sale) return compare
+  return null
+}
+
+export function storefrontVariant(product: Product): Variant | null {
+  return product.variants.find((entry) => entry.active) ?? product.variants[0] ?? null
+}
+
+export function catalogUnitPrice(product: Product) {
+  return unitPrice(product, storefrontVariant(product))
+}
+
+export function normalizeProductPricing(product: Product): Product {
+  const base = normalizeCentavosPricing(product.priceCentavos, product.compareAtCentavos)
+  const variants = product.variants.map((variant) => {
+    if (variant.priceCentavos > 0) {
+      const normalized = normalizeCentavosPricing(variant.priceCentavos, variant.compareAtCentavos)
+      return { ...variant, ...normalized }
+    }
+    if (variant.compareAtCentavos != null && variant.compareAtCentavos > 0) {
+      const normalized = normalizeCentavosPricing(variant.compareAtCentavos, null)
+      return { ...variant, ...normalized }
+    }
+    if (base.priceCentavos > 0) {
+      return { ...variant, priceCentavos: base.priceCentavos, compareAtCentavos: variant.compareAtCentavos ?? base.compareAtCentavos }
+    }
+    return variant
+  })
+  const stock = variants.reduce((sum, variant) => sum + variant.stock, 0)
+  const lead = variants[0]
+  return {
+    ...product,
+    ...base,
+    stock,
+    variants,
+    priceCentavos: lead?.priceCentavos ?? base.priceCentavos,
+    compareAtCentavos: lead?.compareAtCentavos ?? base.compareAtCentavos,
+  }
 }
 
 export function availableStock(product: Product, variant?: Variant | null) {
@@ -87,8 +151,8 @@ export function availableStock(product: Product, variant?: Variant | null) {
 }
 
 export function isOnSale(product: Product) {
-  const compare = product.compareAtCentavos
-  return Boolean(compare && compare > product.priceCentavos)
+  const variant = storefrontVariant(product)
+  return comparePrice(product, variant) != null
 }
 
 export function categoryName(state: DemoState, categoryId: string) {
